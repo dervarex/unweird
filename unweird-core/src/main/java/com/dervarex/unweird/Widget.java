@@ -219,6 +219,14 @@ public abstract class Widget {
     protected void onType(String text) {
     }
 
+    /**
+     * Moves keyboard focus here (if this widget can take it and is on screen). Safe from any thread;
+     * e.g. in {@code onShow()} to put the cursor into a particular field.
+     */
+    public void focus() {
+        Unweird.focus(this);
+    }
+
     // ---- internal input paths (built-in widgets override these; the defaults call the public hooks) ----
 
     boolean keyPressed(int key, int mods, Host host) {

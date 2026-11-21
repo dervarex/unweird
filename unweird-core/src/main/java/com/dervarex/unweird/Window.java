@@ -159,6 +159,12 @@ final class Window implements Host {
         dirty.set(true);
     }
 
+    /** Thread-safe: ends the loop after the current iteration. */
+    void requestClose() {
+        glfwSetWindowShouldClose(handle, true);
+        glfwPostEmptyEvent();
+    }
+
     /** Thread-safe: asks the UI thread to re-evaluate and redraw. */
     void requestRender() {
         dirty.set(true);
@@ -544,6 +550,18 @@ final class Window implements Host {
 
     /** Called for keys nobody used: screen, component and app-wide shortcuts. Set by {@link Unweird}. */
     java.util.function.BiConsumer<KeyPress, Widget> shortcuts = (key, focus) -> { };
+
+    /** Focus asked for from code ({@link Widget#focus()}): only widgets that can take it and are reachable now. */
+    void requestFocus(Widget widget) {
+        Overlay modal = modalOverlay();
+        List<Widget> reachable = modal != null ? modal.focusables() : screen == null ? List.of() : screen.tabOrder();
+        if (reachable.contains(widget)) {
+            focus(widget, true);
+            if (modal == null) {
+                screen.reveal(widget);
+            }
+        }
+    }
 
     private void updateHover() {
         Widget target = null;

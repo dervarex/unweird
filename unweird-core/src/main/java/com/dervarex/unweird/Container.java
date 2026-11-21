@@ -59,6 +59,23 @@ public abstract class Container extends Widget {
         children = null;
     }
 
+    private final java.util.Map<KeyPress.Shortcut, Runnable> shortcuts = java.util.Collections.synchronizedMap(Shortcuts.newMap());
+
+    /**
+     * Runs {@code action} when {@code keys} (e.g. {@code "Ctrl+S"}) are pressed while this is on screen and the focused
+     * widget doesn't use the keys itself. Registering the same keys again replaces the action.
+     * For fixed shortcuts, {@link com.dervarex.unweird.annotation.Shortcut @Shortcut} on a method is shorter.
+     */
+    protected final void shortcut(String keys, Runnable action) {
+        shortcuts.put(KeyPress.Shortcut.parse(keys), java.util.Objects.requireNonNull(action, "action"));
+    }
+
+    java.util.Map<KeyPress.Shortcut, Runnable> shortcuts() {
+        synchronized (shortcuts) {
+            return java.util.Map.copyOf(shortcuts);
+        }
+    }
+
     /** Opens a dialog above everything; see {@link Dialog}. */
     protected final void show(Dialog dialog) {
         Unweird.show(dialog);

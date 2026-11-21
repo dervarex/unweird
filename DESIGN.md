@@ -284,6 +284,20 @@ show(Dialog.confirm("Delete “My world”?", "This can't be undone.")
 - Forms: subclass `Dialog` and declare fields like on a screen; they go between the message and the buttons.
 - Popups (a dropdown inside a dialog) open on top of it; overlays are a stack.
 
+## Focus and shortcuts
+
+```java
+@Shortcut("Ctrl+N") void newTask() { task.focus(); }   // on any screen or component method
+{ shortcut("Ctrl+F", this::find); }                     // dynamic; same keys again replace it
+Unweird.shortcut("Ctrl+Q", Unweird::quit);             // app-wide
+```
+
+- A key the focused widget uses itself (Ctrl+A in a field, Delete while typing) never triggers a shortcut.
+- Otherwise the nearest wins: the component containing the focused widget, then outwards, the screen,
+  its docks, then app-wide shortcuts. An open dialog blocks all of them.
+- `widget.focus()` moves focus there from code (any thread), if it can take focus and is on screen.
+- `Unweird.quit()` closes the window as if the user did.
+
 ## Background work, timers and toasts
 
 ```java

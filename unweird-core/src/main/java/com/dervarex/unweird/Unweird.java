@@ -29,6 +29,7 @@ public final class Unweird {
         }
         Window created = new Window(theme);
         window = created;
+        created.shortcuts = (key, focused) -> Shortcuts.dispatch(key, focused, current, created);
         screens = new Screens();
         try {
             navigate(firstScreen);
@@ -111,6 +112,26 @@ public final class Unweird {
             current.runOnUiThread(() -> current.closeOverlay(overlay));
         } else {
             overlay.closed();
+        }
+    }
+
+    /** Closes the window and ends {@link #start}, as if the user closed it. Thread-safe. */
+    public static void quit() {
+        Window current = window;
+        if (current != null) {
+            current.requestClose();
+        }
+    }
+
+    /** An app-wide shortcut, e.g. {@code Unweird.shortcut("F11", ...)}. Screens and components win over these. */
+    public static void shortcut(String keys, Runnable action) {
+        Shortcuts.GLOBAL.put(KeyPress.Shortcut.parse(keys), Objects.requireNonNull(action, "action"));
+    }
+
+    static void focus(Widget widget) {
+        Window current = window;
+        if (current != null) {
+            current.runOnUiThread(() -> current.requestFocus(widget));
         }
     }
 
