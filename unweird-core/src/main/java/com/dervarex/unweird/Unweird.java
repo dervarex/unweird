@@ -24,6 +24,9 @@ public final class Unweird {
         if (window != null) {
             throw new IllegalStateException("unweird is already running");
         }
+        if (System.getProperty("java.awt.headless") == null) {
+            System.setProperty("java.awt.headless", "true"); // image decoding via ImageIO must not start an AWT GUI next to GLFW
+        }
         Window created = new Window(theme);
         window = created;
         screens = new Screens();

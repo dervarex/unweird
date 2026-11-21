@@ -232,14 +232,44 @@ public final class Canvas {
                 MemoryUtil.memFree(buffer); // NanoVG has uploaded the decoded pixels by now
             }
             if (handle <= 0) {
+                handle = decodeWithImageIo(data);
+            }
+            if (handle <= 0) {
                 handle = -1;
-                System.err.println("unweird: can't decode image " + source + " (PNG, JPEG, BMP, GIF and TGA work)");
+                System.err.println("unweird: can't decode image " + source
+                        + " (PNG, JPEG, BMP, GIF and TGA work; other formats need an ImageIO plugin, e.g. TwelveMonkeys for WebP)");
             }
         } catch (RuntimeException e) {
             System.err.println("unweird: can't load image " + source + ": " + e.getMessage());
         }
         images.put(source, handle);
         return handle;
+    }
+
+    /** Formats NanoVG can't read (WebP, ...) via javax.imageio and whatever plugins are on the classpath. */
+    private int decodeWithImageIo(byte[] data) {
+        java.awt.image.BufferedImage image;
+        try {
+            image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(data));
+        } catch (java.io.IOException | RuntimeException e) {
+            return -1;
+        }
+        if (image == null) {
+            return -1;
+        }
+        int width = image.getWidth();
+        int height = image.getHeight();
+        int[] argb = image.getRGB(0, 0, width, height, null, 0, width);
+        ByteBuffer rgba = MemoryUtil.memAlloc(width * height * 4);
+        try {
+            for (int pixel : argb) {
+                rgba.put((byte) (pixel >> 16)).put((byte) (pixel >> 8)).put((byte) pixel).put((byte) (pixel >>> 24));
+            }
+            rgba.flip();
+            return nvgCreateImageRGBA(vg, width, height, 0, rgba);
+        } finally {
+            MemoryUtil.memFree(rgba);
+        }
     }
 
     /** Pixel size of a loaded image, {width, height}. */

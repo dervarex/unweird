@@ -4,6 +4,8 @@ plugins {
 
 dependencies {
     implementation(project(":unweird-components"))
+    implementation(project(":unweird-install"))
+    implementation(libs.gson) // for the Modrinth source
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)

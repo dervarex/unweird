@@ -103,6 +103,42 @@ so they chain at the declaration.
 
 Pages taller than the window scroll (mouse wheel, thin scrollbar); Tab scrolls the focused widget into view.
 
+## Installing content (`unweird-install`)
+
+A general module for apps that browse a catalog and install things into a folder: mods, resource packs,
+shaders, modpacks, plugins, assets. It doesn't know any particular catalog; you implement one small interface:
+
+```java
+public interface Source {
+    List<Kind> kinds();                                   // "Mods", "Resource packs", ...
+    Results search(String query, Kind kind, int offset);  // background thread, may block
+    Release release(Item item);                           // what installing it means right now
+}
+```
+
+A `Release` lists verified downloads (url, relative path, SHA-1, size), required items, archives to unpack
+(e.g. a modpack's `overrides/`) and info to keep (e.g. the Minecraft version a pack needs).
+
+```java
+Installer installer = new Installer(source, gameDirectory);
+ContentBrowser browser = new ContentBrowser(installer);   // a ready-made UI: search, kinds, cards, Install/Remove
+```
+
+**Installed state can't go stale.** `installer.status(item)` is computed every time from a running job,
+the last failure, and the manifest (`.unweird-installed.json`) checked against the files on disk. The UI only
+ever shows `() -> installer.status(item)...`, re-evaluated after every event:
+- deleting a file by hand → the item shows "Install" again (also after a restart)
+- an item installed only as a dependency shows as installed in any search
+- a failed install leaves nothing behind (downloads go to `.part` files, are hash-checked, and are only
+  recorded once everything succeeded); the button says "Retry" with the reason
+- Remove deletes the item's files and dependencies nothing else needs; updating removes the old version's files
+- paths that would escape the folder (`../`, zip slip) and writes over the manifest are refused
+
+The example app's `ModrinthSource` (≈150 lines) plugs Modrinth in: mods, resource packs, shaders, data packs
+and `.mrpack` modpacks (server-only files skipped, overrides unpacked). Icons in WebP work through the
+TwelveMonkeys ImageIO plugin that `unweird-install` brings along; core falls back to ImageIO for any image
+format NanoVG can't read.
+
 ## Screens
 
 - One class per screen, extending `Screen`.
@@ -249,11 +285,15 @@ A relation to a text that's currently empty (hidden) is ignored until that text 
 | **M2** ✅ | `Field`: typing, cursor, selection, clipboard, masking, scrolling, blinking caret; focus & Tab; keyboard-activated buttons; empty texts collapse |
 | **M3** ✅ | `go(...)`, screen caching, `@Fresh`, `onShow`/`onHide`; `@Default` docking, `@Without`, `shared(...)`; compile-time `@Default` checks |
 | **M4** ✅ | Card/page inference, components laid out like screens, button-row variants; relational overrides; theme switching, explicit variants and text styles |
-| **M5** 🚧 | ✅ scrolling pages, checkbox, toggle, dropdown (overlay layer), list, image · ⏳ first `unweird-components` (`LoginForm`) |
+| **M5** ✅ | Scrolling pages, checkbox, toggle, dropdown (overlay layer), list, image, `Each`, `@Card`, `visibleIf`/`enabledIf`; `unweird-components` with `LoginForm` |
+| **M6** ✅ | `unweird-install`: generic `Source` → `Installer` (verified downloads, dependencies, archives, honest installed state) + `ContentBrowser`; Modrinth source in the example |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
 
 ## Open points
 
 - `Field` label: placeholder for now; a floating label could come with `unweird-anim`.
 - Undo/redo in fields (Ctrl+Z): not yet.
+- Emoji and scripts Noto Sans doesn't cover show as boxes; a fallback font (NanoVG supports fallbacks) would fix it.
+- `unweird-install`: update checks, "adopt" files that were already in the folder (via the source looking up hashes),
+  and an "Installed" tab in `ContentBrowser`.
 - Default ordering when several components dock on the same side.

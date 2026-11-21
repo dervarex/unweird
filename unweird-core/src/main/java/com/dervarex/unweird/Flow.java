@@ -92,7 +92,7 @@ final class Flow {
     static boolean formLike(Container container) {
         for (Widget child : container.children()) {
             if (child instanceof Container nested) {
-                if (!formLike(nested)) {
+                if (nested instanceof Each<?> || nested.card || !formLike(nested)) { // lists and cards make a page
                     return false;
                 }
             } else if (!(child instanceof Text || child instanceof Field || child instanceof Dropdown<?>
@@ -319,7 +319,7 @@ final class Flow {
         int flexible = 0;
         for (int i = 0; i < row.size(); i++) {
             Widget widget = row.get(i);
-            if (isInput(widget) || widget instanceof Container) {
+            if (isFlexible(widget)) {
                 flexible++;
             } else {
                 widths[i] = widget.measure(canvas, Math.max(0, width - used)).width();
@@ -329,7 +329,7 @@ final class Flow {
         if (flexible > 0) {
             float share = Math.max(0, (width - used) / flexible);
             for (int i = 0; i < row.size(); i++) {
-                if (isInput(row.get(i)) || row.get(i) instanceof Container) {
+                if (isFlexible(row.get(i))) {
                     widths[i] = share;
                 }
             }
@@ -373,6 +373,11 @@ final class Flow {
     /** Fields, dropdowns and lists: boxes you fill in or pick from, which stretch to the available width. */
     private static boolean isInput(Widget widget) {
         return widget instanceof Field || widget instanceof Dropdown<?> || widget instanceof ListView<?>;
+    }
+
+    /** Takes the space left in a mixed row: fields, lists and components. Dropdowns keep their natural width. */
+    private static boolean isFlexible(Widget widget) {
+        return widget instanceof Field || widget instanceof ListView<?> || widget instanceof Container;
     }
 
     private static float itemGap(Widget widget) {

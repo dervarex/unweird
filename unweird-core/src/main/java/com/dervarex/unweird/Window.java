@@ -264,17 +264,21 @@ final class Window implements Host {
             }
         });
         glfwSetCursorEnterCallback(handle, (window, entered) -> {
-            if (!entered) {
+            if (entered) {
+                syncCursor();
+            } else {
                 cursorX = -1;
                 cursorY = -1;
-                updateHover();
             }
+            updateHover();
         });
         glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
             if (button != GLFW_MOUSE_BUTTON_LEFT) {
                 return;
             }
             if (action == GLFW_PRESS) {
+                syncCursor(); // a press can arrive before any move event (e.g. right after entering the window)
+                updateHover();
                 countClicks();
                 if (overlay != null && !overlay.contains(logical(cursorX), logical(cursorY))) {
                     closeOverlay(); // a click outside a popup only closes it
@@ -362,6 +366,15 @@ final class Window implements Host {
             });
             dirty.set(true);
         }
+    }
+
+    /** Reads the real cursor position, in case no move event told us yet. */
+    private void syncCursor() {
+        double[] x = new double[1];
+        double[] y = new double[1];
+        glfwGetCursorPos(handle, x, y);
+        cursorX = x[0];
+        cursorY = y[0];
     }
 
     private float logical(double windowCoordinate) {
