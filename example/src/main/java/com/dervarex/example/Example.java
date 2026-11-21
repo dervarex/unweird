@@ -7,6 +7,10 @@ public class Example {
 
     public static void main(String[] args) {
         Unweird.shortcut("Ctrl+Q", Unweird::quit);
-        Unweird.start(LoginScreen.class);
+        Unweird.app("unweird demo")
+                .size(1000, 680).minSize(760, 480)
+                .icon("/images/logo.png")
+                .remember()
+                .start(LoginScreen.class);
     }
 }

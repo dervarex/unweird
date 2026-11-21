@@ -315,6 +315,16 @@ The event loop sleeps until the next input *or* the next timer, so timers cost n
 
 ## Runtime & threading
 
+```java
+Unweird.app("My Launcher")
+        .size(1100, 720).minSize(800, 520)   // logical pixels; the window manager enforces the minimum
+        .icon("/images/logo.png")            // not on Wayland/macOS, which don't have window icons
+        .remember()                          // position, size, maximized: <config dir>/<app>/window.properties
+        .start(LoginScreen.class);
+```
+The window title is "<screen @Title> — <app name>". A remembered position is only used if it's on a connected monitor.
+`Unweird.start(Screen.class)` alone still works, with defaults.
+
 - `Unweird.start(...)` takes over the calling thread as the UI thread.
   It must be the main thread, which GLFW requires on macOS.
 - All handlers run on the UI thread.

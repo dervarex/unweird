@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -37,8 +38,6 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  */
 final class Window implements Host {
 
-    private static final int DEFAULT_WIDTH = 960;
-    private static final int DEFAULT_HEIGHT = 640;
     private static final String FONT_DIR = "/com/dervarex/unweird/fonts/";
     private static final double BLINK_SECONDS = 0.53;
     private static final double MULTI_CLICK_SECONDS = 0.4;
@@ -82,8 +81,18 @@ final class Window implements Host {
     /** Window coordinates → logical pixels. */
     private float windowToLogical = 1;
 
-    Window(Theme theme) {
+    private final App app;
+    private final Path boundsFile;
+    /** Last position/size while not maximized, so a maximized window still remembers its normal bounds. */
+    private int normalX;
+    private int normalY;
+    private int normalWidth;
+    private int normalHeight;
+
+    Window(Theme theme, App app) {
         this.theme = theme;
+        this.app = app;
+        this.boundsFile = app.remember ? WindowBounds.file(app.name) : null;
 
         GLFWErrorCallback.createPrint(System.err).set();
         if (!glfwInit()) {
@@ -100,12 +109,32 @@ final class Window implements Host {
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
         glfwWindowHint(GLFW_STENCIL_BITS, 8);
 
-        handle = glfwCreateWindow(DEFAULT_WIDTH, DEFAULT_HEIGHT, "unweird", NULL, NULL);
+        WindowBounds saved = boundsFile == null ? null : WindowBounds.load(boundsFile);
+        int width = saved != null ? saved.width() : app.width;
+        int height = saved != null ? saved.height() : app.height;
+        handle = glfwCreateWindow(width, height, app.name, NULL, NULL);
         if (handle == NULL) {
             glfwTerminate();
             throw new IllegalStateException("unweird: could not create a window (OpenGL 3.3 is required)");
         }
-        centerOnPrimaryMonitor();
+        if (app.minWidth > 0 || app.minHeight > 0) {
+            glfwSetWindowSizeLimits(handle, app.minWidth > 0 ? app.minWidth : GLFW_DONT_CARE,
+                    app.minHeight > 0 ? app.minHeight : GLFW_DONT_CARE, GLFW_DONT_CARE, GLFW_DONT_CARE);
+        }
+        boolean wayland = glfwGetPlatform() == GLFW_PLATFORM_WAYLAND; // no window positions or icons there
+        if (!wayland && saved != null && onSomeMonitor(saved)) {
+            glfwSetWindowPos(handle, saved.x(), saved.y());
+        } else if (!wayland) {
+            centerOnPrimaryMonitor();
+        }
+        if (app.icon != null && !wayland) {
+            setIcon(app.icon);
+        }
+        boolean startMaximized = saved != null ? saved.maximized() : app.maximized;
+        if (startMaximized) {
+            glfwMaximizeWindow(handle);
+        }
+        rememberNormalBounds();
 
         glfwMakeContextCurrent(handle);
         GL.createCapabilities();
@@ -142,7 +171,9 @@ final class Window implements Host {
         focus(null, false);
         screen = next;
         Title title = next.getClass().getAnnotation(Title.class);
-        glfwSetWindowTitle(handle, title != null ? title.value() : "unweird");
+        glfwSetWindowTitle(handle, title == null ? app.name
+                : app.name.equals(Unweird.DEFAULT_NAME) || title.value().equals(app.name) ? title.value()
+                : title.value() + " — " + app.name);
 
         // Put the cursor in the first text field, so a login form can be typed into right away.
         for (Widget widget : next.focusables()) {
@@ -308,6 +339,10 @@ final class Window implements Host {
     /** Runs until the window is closed. Blocks the calling (UI) thread. */
     void run() {
         glfwShowWindow(handle);
+        if (boundsFile != null) {
+            glfwSetWindowPosCallback(handle, (window, x, y) -> rememberNormalBounds());
+            glfwSetWindowSizeCallback(handle, (window, w, h) -> rememberNormalBounds());
+        }
         while (!glfwWindowShouldClose(handle)) {
             for (Runnable task; (task = uiTasks.poll()) != null; ) {
                 safely(null, task);
@@ -338,6 +373,13 @@ final class Window implements Host {
     }
 
     void close() {
+        if (boundsFile != null) {
+            boolean maximized = glfwGetWindowAttrib(handle, GLFW_MAXIMIZED) == GLFW_TRUE;
+            rememberNormalBounds();
+            if (normalWidth > 0 && normalHeight > 0) {
+                new WindowBounds(normalX, normalY, normalWidth, normalHeight, maximized).save(boundsFile);
+            }
+        }
         org.lwjgl.glfw.Callbacks.glfwFreeCallbacks(handle);
         canvas.free();
         nvgDelete(vg);
@@ -800,6 +842,63 @@ final class Window implements Host {
             System.err.println(source == null ? "unweird: a task on the UI thread threw:"
                     : "unweird: a handler on " + source.getClass().getSimpleName() + " threw:");
             e.printStackTrace();
+        }
+    }
+
+    private void rememberNormalBounds() {
+        if (glfwGetWindowAttrib(handle, GLFW_MAXIMIZED) == GLFW_TRUE || glfwGetWindowAttrib(handle, GLFW_ICONIFIED) == GLFW_TRUE) {
+            return;
+        }
+        int[] x = new int[1], y = new int[1], w = new int[1], h = new int[1];
+        glfwGetWindowPos(handle, x, y);
+        glfwGetWindowSize(handle, w, h);
+        normalX = x[0];
+        normalY = y[0];
+        normalWidth = w[0];
+        normalHeight = h[0];
+    }
+
+    /** Whether the saved window's top-left area is on a monitor that's connected now. */
+    private static boolean onSomeMonitor(WindowBounds bounds) {
+        var monitors = glfwGetMonitors();
+        if (monitors == null) {
+            return false;
+        }
+        for (int i = 0; i < monitors.limit(); i++) {
+            int[] x = new int[1], y = new int[1], w = new int[1], h = new int[1];
+            glfwGetMonitorWorkarea(monitors.get(i), x, y, w, h);
+            int probeX = bounds.x() + 40;
+            int probeY = bounds.y() + 20;
+            if (probeX >= x[0] && probeY >= y[0] && probeX < x[0] + w[0] && probeY < y[0] + h[0]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void setIcon(String resource) {
+        try (InputStream in = Window.class.getResourceAsStream(resource.startsWith("/") ? resource : "/" + resource)) {
+            java.awt.image.BufferedImage image = in == null ? null : javax.imageio.ImageIO.read(in);
+            if (image == null) {
+                System.err.println("unweird: can't load window icon " + resource);
+                return;
+            }
+            int w = image.getWidth();
+            int h = image.getHeight();
+            int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
+            ByteBuffer pixels = MemoryUtil.memAlloc(w * h * 4);
+            try (org.lwjgl.glfw.GLFWImage.Buffer images = org.lwjgl.glfw.GLFWImage.malloc(1)) {
+                for (int pixel : argb) {
+                    pixels.put((byte) (pixel >> 16)).put((byte) (pixel >> 8)).put((byte) pixel).put((byte) (pixel >>> 24));
+                }
+                pixels.flip();
+                images.get(0).set(w, h, pixels);
+                glfwSetWindowIcon(handle, images);
+            } finally {
+                MemoryUtil.memFree(pixels);
+            }
+        } catch (IOException e) {
+            System.err.println("unweird: can't load window icon " + resource + ": " + e.getMessage());
         }
     }
 

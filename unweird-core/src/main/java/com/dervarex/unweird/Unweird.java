@@ -7,6 +7,8 @@ import java.util.Objects;
 /** Entry point: {@code Unweird.start(LoginScreen.class);} */
 public final class Unweird {
 
+    static final String DEFAULT_NAME = "unweird";
+
     private static volatile Window window;
     private static volatile Theme theme = Theme.light();
     private static Screens screens;
@@ -20,6 +22,15 @@ public final class Unweird {
      * Call this from the main thread; it takes over that thread as the UI thread.
      */
     public static void start(Class<? extends Screen> firstScreen) {
+        start(new App(DEFAULT_NAME), firstScreen);
+    }
+
+    /** Window and app settings: {@code Unweird.app("My Launcher").size(1100, 720).remember().start(Home.class)}. */
+    public static App app(String name) {
+        return new App(Objects.requireNonNull(name, "name"));
+    }
+
+    static void start(App app, Class<? extends Screen> firstScreen) {
         Objects.requireNonNull(firstScreen, "firstScreen");
         if (window != null) {
             throw new IllegalStateException("unweird is already running");
@@ -27,7 +38,7 @@ public final class Unweird {
         if (System.getProperty("java.awt.headless") == null) {
             System.setProperty("java.awt.headless", "true"); // image decoding via ImageIO must not start an AWT GUI next to GLFW
         }
-        Window created = new Window(theme);
+        Window created = new Window(theme, app);
         window = created;
         created.shortcuts = (key, focused) -> Shortcuts.dispatch(key, focused, current, created);
         screens = new Screens();
