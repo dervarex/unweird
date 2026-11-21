@@ -228,6 +228,14 @@ public abstract class Widget {
         return false;
     }
 
+    /**
+     * Files were dragged from the file manager and dropped onto this widget. Return true to take them; otherwise
+     * they're offered to the parent, up to the screen.
+     */
+    protected boolean onDrop(Pointer at, java.util.List<java.nio.file.Path> files) {
+        return false;
+    }
+
     /** A key was pressed (or repeats) while this widget has focus. Return true if it was used. */
     protected boolean onKey(KeyPress key) {
         return false;
@@ -281,6 +289,11 @@ public abstract class Widget {
 
     boolean scrolled(Pointer at, double dx, double dy) {
         return onScroll(at, dx, dy);
+    }
+
+    /** The deepest shown widget at the point (interactive or not), or null. */
+    Widget widgetAt(float px, float py) {
+        return visible && contains(px, py) ? this : null;
     }
 
     /** Whether the window should blink a caret while this widget is focused. */

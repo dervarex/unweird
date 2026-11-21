@@ -112,6 +112,8 @@ Extend `Widget`, implement `measure` and `draw` (with `Canvas`), and override th
 | `onScroll(Pointer, dx, dy)` | Return true to use it, otherwise the page scrolls |
 | `onKey(KeyPress)` / `onType(String)` | While focused; `key.is("Ctrl+S")`, letters follow the keyboard layout |
 
+| `onDrop(Pointer, List<Path>)` | Files dropped from the file manager; return true to take them, otherwise the parent gets them, up to the screen |
+
 Handlers just change state; the UI re-evaluates and redraws after every event. `Slider` is built only on these hooks.
 
 ### Ready-made components (`unweird-components`)
@@ -189,7 +191,8 @@ View3D view = new View3D(scene)
   freed when unused for ~300 frames, so rebuilding meshes after edits is fine. Animations use `requestFrame()`
   (core): the window renders continuously only while something asks for it.
 
-The example app has a skin viewer (`SkinModel`, ~80 lines: walk animation, slim arms, outer layer, load by URL)
+The example app has a skin viewer (`SkinModel` ~80 lines, `SkinLoader` ~150: load by Minecraft username via Mojang's API
+with slim-arm detection, by URL, by file path or by dropping a PNG; legacy 64×32 skins converted; spin toggle and turn slider)
 and a block-world editor (`VoxelWorld`: place with click, remove with right-click).
 
 ## Screens
@@ -272,8 +275,9 @@ The engine looks at the content (declaration order plus widget types) and picks 
 5. **Groups:** consecutive `Button`s share a row. On a card they split the width evenly; on a page they keep their
    natural width. The first button in a row is primary, the others secondary.
    Spacing is tighter inside groups (heading → subtitle 6px, field → field 10px) and larger between them.
-6. **Empty texts take no space**, so a status line appears only when it has something to say.
-7. **Components** in the content use these same rules, so a form looks the same whether its widgets sit
+6. **Rows that don't fit wrap** onto the next line (fields keep at least 160px) instead of squeezing widgets.
+7. **Empty texts take no space**, so a status line appears only when it has something to say.
+8. **Components** in the content use these same rules, so a form looks the same whether its widgets sit
    directly on the screen or inside a `Component`.
 
 ### Overrides (relational, type-checked)

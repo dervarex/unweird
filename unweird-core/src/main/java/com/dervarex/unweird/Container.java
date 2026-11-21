@@ -200,6 +200,21 @@ public abstract class Container extends Widget {
         return interactive() || hoverOnly() ? this : null;
     }
 
+    @Override
+    Widget widgetAt(float px, float py) {
+        if (!isShown() || !contains(px, py)) {
+            return null;
+        }
+        List<Widget> kids = children();
+        for (int i = kids.size() - 1; i >= 0; i--) {
+            Widget hit = kids.get(i).widgetAt(px, py);
+            if (hit != null) {
+                return hit;
+            }
+        }
+        return this;
+    }
+
     /** All focusable widgets inside this container, in Tab order (declaration order, depth first). */
     final List<Widget> focusables() {
         List<Widget> result = new ArrayList<>();

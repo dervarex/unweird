@@ -644,6 +644,31 @@ final class Window implements Host {
                 dirty.set(true);
             }
         });
+        glfwSetDropCallback(handle, (window, count, names) -> {
+            List<java.nio.file.Path> files = new java.util.ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                try {
+                    files.add(java.nio.file.Path.of(org.lwjgl.glfw.GLFWDropCallback.getName(names, i)));
+                } catch (java.nio.file.InvalidPathException ignored) {
+                    // not a local file
+                }
+            }
+            syncCursor();
+            if (files.isEmpty() || screen == null || modalOverlay() != null) {
+                return;
+            }
+            Pointer at = pointer(Pointer.Button.NONE, 0, 0, 0);
+            List<java.nio.file.Path> dropped = List.copyOf(files);
+            for (Widget w = screen.widgetAt(at.x(), at.y()); w != null; w = w.parent) { // the widget under the mouse, then outwards
+                Widget candidate = w;
+                boolean[] used = {false};
+                safely(candidate, () -> used[0] = candidate.onDrop(at, dropped));
+                if (used[0]) {
+                    break;
+                }
+            }
+            dirty.set(true);
+        });
         glfwSetFramebufferSizeCallback(handle, (window, w, h) -> dirty.set(true));
         glfwSetWindowContentScaleCallback(handle, (window, sx, sy) -> dirty.set(true));
         glfwSetWindowRefreshCallback(handle, window -> render());

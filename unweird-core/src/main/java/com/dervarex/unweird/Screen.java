@@ -142,6 +142,21 @@ public abstract class Screen extends Container {
         return inContent(px, py) ? super.hitTest(px, py) : null;
     }
 
+    @Override
+    Widget widgetAt(float px, float py) {
+        for (DockSlot slot : docks) {
+            Widget hit = slot.component.widgetAt(px, py);
+            if (hit != null) {
+                return hit;
+            }
+        }
+        if (!inContent(px, py)) {
+            return this;
+        }
+        Widget hit = super.widgetAt(px, py);
+        return hit != null ? hit : this;
+    }
+
     /** Tab order for the whole window: top and left docks, the content, then right and bottom docks. */
     final List<Widget> tabOrder() {
         List<Widget> order = new ArrayList<>();

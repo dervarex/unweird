@@ -42,6 +42,10 @@ final class Flow {
     private static final float PAGE_TOP = 40;
     private static final float PAGE_BOTTOM = 40;
     private static final float ROW_ITEM_GAP = 8;
+    /** Space between the lines of a row that had to wrap. */
+    private static final float WRAP_GAP = 10;
+    /** The least a field (or other stretching widget) gets in a row before the row wraps. */
+    private static final float MIN_FLEXIBLE = 160;
 
     private Flow() {
     }
@@ -126,12 +130,14 @@ final class Flow {
         List<Widget> order = reorder(container, visible);
         inferRoles(container, order);
         List<List<Widget>> rows = rows(container, order);
+        Set<List<Widget>> continued = Collections.newSetFromMap(new IdentityHashMap<>());
+        rows = wrap(rows, canvas, width, mode, continued);
 
         float height = 0;
         for (int i = 0; i < rows.size(); i++) {
             List<Widget> row = rows.get(i);
             if (i > 0) {
-                height += gap(rows.get(i - 1), row, mode);
+                height += continued.contains(row) ? WRAP_GAP : gap(rows.get(i - 1), row, mode);
             }
             float[] widths = widths(row, canvas, width, mode);
             float rowHeight = 0;
@@ -335,6 +341,39 @@ final class Flow {
             }
         }
         return widths;
+    }
+
+    /**
+     * Rows whose widgets don't fit side by side continue on the next line instead of squeezing the last ones
+     * (which would leave them drawn but too narrow to click). Card button rows split the width instead, so they never wrap.
+     * Lines after the first are added to {@code continued}.
+     */
+    static List<List<Widget>> wrap(List<List<Widget>> rows, Canvas canvas, float width, Mode mode, Set<List<Widget>> continued) {
+        List<List<Widget>> out = new ArrayList<>();
+        for (List<Widget> row : rows) {
+            boolean splitsEvenly = mode == Mode.CARD && row.stream().allMatch(w -> w instanceof Button);
+            if (row.size() < 2 || splitsEvenly) {
+                out.add(row);
+                continue;
+            }
+            List<Widget> line = new ArrayList<>();
+            float used = 0;
+            for (Widget widget : row) {
+                float need = isFlexible(widget) ? MIN_FLEXIBLE : widget.measure(canvas, width).width();
+                float gap = line.isEmpty() ? 0 : itemGap(widget);
+                if (!line.isEmpty() && used + gap + need > width) {
+                    out.add(line);
+                    line = new ArrayList<>();
+                    used = 0;
+                    gap = 0;
+                    continued.add(line);
+                }
+                line.add(widget);
+                used += gap + need;
+            }
+            out.add(line);
+        }
+        return out;
     }
 
     /** First automatic button in a row is primary, the rest secondary. Explicit variants always win. */
