@@ -161,6 +161,37 @@ and `.mrpack` modpacks (server-only files skipped, overrides unpacked). Icons in
 TwelveMonkeys ImageIO plugin that `unweird-install` brings along; core falls back to ImageIO for any image
 format NanoVG can't read.
 
+## 3D (`unweird-3d`)
+
+A 3D view is just another widget in the layout; it clips, scrolls and has rounded corners like everything else.
+
+```java
+Scene scene = new Scene().add(new Node(Mesh.box(1, 1, 1), Material.color(Color.hex("#5fae3e"))));
+View3D view = new View3D(scene)
+        .camera(Camera.orbit(0, 0, 0, 5).angles(30, 20))
+        .height(360)
+        .autoRotate(20)                         // degrees per second, pauses while dragging
+        .onFrame(t -> ...)                      // animate; keeps frames coming while set
+        .onClick((hit, button) -> ...);         // click without dragging: what's under the mouse (or null)
+```
+
+- **Scene graph:** `Node`s with mesh, material, position/rotation/scale and children (rotate a limb around its
+  shoulder by putting the shoulder in a parent). `Scene` adds a sun direction, ambient light and an optional background.
+- **Meshes:** `Mesh.box(...)`, `Mesh.plane(...)`, a builder with quads/triangles/vertex colors, `blockFace(...)` for
+  voxel worlds, and `BoxUv` for the common "box UV" texture layout (Blockbench, Minecraft skins).
+- **Materials:** color tint, texture (`Texture.resource/file/url`, `.nearest()` for pixel art, swappable live),
+  lit or unlit, `cutout()` (sharp holes), `transparent()` (blended, sorted back to front), `doubleSided()`.
+- **Camera:** orbit camera; left-drag orbits, right/middle-drag pans, wheel zooms, arrows and +/- when focused.
+- **Picking:** `scene.pick(ray)` / `view.pick(x, y)` → `Hit` with node, point, normal, distance;
+  `hit.block()` and `hit.blockInFront()` for block worlds.
+- **Under the hood:** OpenGL 3.3, rendered into a 4× multisampled offscreen surface (`Canvas.gl(...)` in core, usable
+  for any custom GL drawing) and composited by NanoVG. GPU copies of meshes and textures are made on first use and
+  freed when unused for ~300 frames, so rebuilding meshes after edits is fine. Animations use `requestFrame()`
+  (core): the window renders continuously only while something asks for it.
+
+The example app has a skin viewer (`SkinModel`, ~80 lines: walk animation, slim arms, outer layer, load by URL)
+and a block-world editor (`VoxelWorld`: place with click, remove with right-click).
+
 ## Screens
 
 - One class per screen, extending `Screen`.
@@ -365,7 +396,7 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
 | **M6** ✅ | `unweird-install`: generic `Source` → `Installer` (verified downloads, dependencies, archives, honest installed state) + `ContentBrowser`; Modrinth source in the example |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
 | **M7** ✅ | Foundations: custom-widget input API (`Slider` built on it), window options (`Unweird.app(...)`), dialogs, toasts, `async`, timers, `@Shortcut`/`focus()`, tooltips, `maxLines`, field undo, fallback fonts |
-| **3D** | `unweird-3d` (branch `3d-rendering`): a 3D viewport widget inside normal layouts, e.g. a Minecraft skin viewer or a 3D world editor; meshes, textures, camera controls |
+| **3D** ✅ | `unweird-3d` (branch `3d-rendering`): `View3D` in normal layouts, scene graph, meshes/box UV, textures, materials, orbit camera, picking; `Canvas.gl` + `requestFrame` in core; skin viewer and world editor demos |
 
 ## Open points
 

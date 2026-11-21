@@ -219,6 +219,15 @@ final class Window implements Host {
         dirty.set(true);
     }
 
+    private boolean frameRequested;
+    private double lastFrameTime;
+    private static final double MIN_FRAME_SECONDS = 1.0 / 120; // cap for animations where vsync doesn't throttle
+
+    /** UI thread (from draw): render again right after this frame. */
+    void requestFrame() {
+        frameRequested = true;
+    }
+
     /** Thread-safe: ends the loop after the current iteration. */
     void requestClose() {
         glfwSetWindowShouldClose(handle, true);
@@ -383,7 +392,18 @@ final class Window implements Host {
                 dirty.set(true);
             }
             if (dirty.getAndSet(false)) {
+                double sinceLast = glfwGetTime() - lastFrameTime;
+                if (frameRequested && sinceLast < MIN_FRAME_SECONDS) {
+                    dirty.set(true);
+                    glfwWaitEventsTimeout(MIN_FRAME_SECONDS - sinceLast); // still handle input while animating
+                    continue;
+                }
+                frameRequested = false;
+                lastFrameTime = glfwGetTime();
                 render();
+                if (frameRequested) {
+                    dirty.set(true); // someone is animating
+                }
                 continue;
             }
             double wake = nextTimerDue();
@@ -451,6 +471,7 @@ final class Window implements Host {
 
         nvgBeginFrame(vg, fbWidth[0] / scale, fbHeight[0] / scale, scale);
         canvas.setTheme(theme);
+        canvas.beginFrame(scale, glfwGetTime(), fbWidth[0], fbHeight[0]);
         float logicalWidth = fbWidth[0] / scale;
         float logicalHeight = fbHeight[0] / scale;
         if (screen != null) {
@@ -464,6 +485,7 @@ final class Window implements Host {
         drawToasts(logicalWidth, logicalHeight);
         drawTooltip(logicalWidth, logicalHeight);
         nvgEndFrame(vg);
+        canvas.collectSurfaces();
         glfwSwapBuffers(handle);
 
         if (focused != null && !focused.interactive()) {

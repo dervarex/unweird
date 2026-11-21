@@ -4,6 +4,7 @@ lombok = "1.18.42"
 junit = "6.0.0"
 gson = "2.13.1"
 twelvemonkeys = "3.12.0"
+joml = "1.10.8"
 
 [libraries]
 lwjgl-bom = { module = "org.lwjgl:lwjgl-bom", version.ref = "lwjgl" }
@@ -12,6 +13,7 @@ lwjgl-glfw = { module = "org.lwjgl:lwjgl-glfw" }
 lwjgl-opengl = { module = "org.lwjgl:lwjgl-opengl" }
 lwjgl-nanovg = { module = "org.lwjgl:lwjgl-nanovg" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+joml = { module = "org.joml:joml", version.ref = "joml" }
 imageio-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }

@@ -238,6 +238,14 @@ public abstract class Widget {
     }
 
     /**
+     * Asks for another frame right after this one, for animations: call it from {@link #draw} while something moves
+     * and read {@link Canvas#time()} for the clock. When nobody asks, the window goes back to sleeping.
+     */
+    protected final void requestFrame() {
+        Unweird.requestFrame();
+    }
+
+    /**
      * Moves keyboard focus here (if this widget can take it and is on screen). Safe from any thread;
      * e.g. in {@code onShow()} to put the cursor into a particular field.
      */

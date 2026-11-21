@@ -5,5 +5,6 @@ include(
     "unweird-processor",
     "unweird-components",
     "unweird-install",
+    "unweird-3d",
     "example",
 )

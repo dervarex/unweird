@@ -139,6 +139,13 @@ public final class Unweird {
         Shortcuts.GLOBAL.put(KeyPress.Shortcut.parse(keys), Objects.requireNonNull(action, "action"));
     }
 
+    static void requestFrame() {
+        Window current = window;
+        if (current != null) {
+            current.requestFrame();
+        }
+    }
+
     static void focus(Widget widget) {
         Window current = window;
         if (current != null) {

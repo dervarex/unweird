@@ -4,6 +4,8 @@ import com.dervarex.example.screens.AboutScreen;
 import com.dervarex.example.screens.HomeScreen;
 import com.dervarex.example.screens.ModsScreen;
 import com.dervarex.example.screens.SettingsScreen;
+import com.dervarex.example.screens.SkinScreen;
+import com.dervarex.example.screens.WorldScreen;
 import com.dervarex.example.screens.TasksScreen;
 import com.dervarex.unweird.Button;
 import com.dervarex.unweird.Component;
@@ -20,6 +22,8 @@ public class Sidebar extends Component {
     @Getter private final Button home     = new Button("Home").onClick(() -> go(HomeScreen.class));
     @Getter private final Button tasks    = new Button("Tasks").onClick(() -> go(TasksScreen.class));
     @Getter private final Button mods     = new Button("Mods").onClick(() -> go(ModsScreen.class));
+    @Getter private final Button skin     = new Button("Skin").onClick(() -> go(SkinScreen.class));
+    @Getter private final Button world    = new Button("World").onClick(() -> go(WorldScreen.class));
     @Getter private final Button settings = new Button("Settings").onClick(() -> go(SettingsScreen.class));
     @Getter private final Button about    = new Button("About").onClick(() -> go(AboutScreen.class));
 }

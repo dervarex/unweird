@@ -49,6 +49,28 @@ public final class Canvas {
     @Setter(AccessLevel.PACKAGE)
     private Theme theme;
 
+    /** Physical pixels per logical pixel in this frame. */
+    @Getter
+    private float pixelRatio = 1;
+    /** Seconds since the app started, at the start of this frame. For animations. */
+    private double time;
+    private int framebufferWidth;
+    private int framebufferHeight;
+    private long frame;
+
+    void beginFrame(float pixelRatio, double time, int framebufferWidth, int framebufferHeight) {
+        this.pixelRatio = pixelRatio;
+        this.time = time;
+        this.framebufferWidth = framebufferWidth;
+        this.framebufferHeight = framebufferHeight;
+        frame++;
+    }
+
+    /** Seconds since the app started, at the start of this frame. Use it for animations (with {@link Widget#requestFrame()}). */
+    public double time() {
+        return time;
+    }
+
     Canvas(long vg, int regularFont, int semiboldFont, Theme theme) {
         this.vg = vg;
         this.regularFont = regularFont;
@@ -417,7 +439,44 @@ public final class Canvas {
         nvgRestore(vg);
     }
 
+    // ---- raw OpenGL surfaces ----
+
+    private final Map<Object, GlSurface> surfaces = new HashMap<>();
+
+    /**
+     * Lets {@code painter} draw with raw OpenGL into an offscreen surface (4x antialiased, with a depth buffer),
+     * then shows the result at (x, y, width, height) like an image: clipped, scrolled and rounded like everything else.
+     * {@code owner} identifies the surface between frames (usually the widget itself).
+     */
+    public void gl(Object owner, float x, float y, float width, float height, float radius, GlPainter painter) {
+        int pixelWidth = Math.max(1, Math.round(width * pixelRatio));
+        int pixelHeight = Math.max(1, Math.round(height * pixelRatio));
+        GlSurface surface = surfaces.computeIfAbsent(owner, o -> new GlSurface());
+        surface.render(vg, pixelWidth, pixelHeight, frame, painter);
+        // back to what NanoVG draws into
+        org.lwjgl.opengl.GL30C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, 0);
+        org.lwjgl.opengl.GL11C.glViewport(0, 0, framebufferWidth, framebufferHeight);
+        nvgImagePattern(vg, x, y, width, height, 0, surface.nvgImage, 1, paint);
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, radius);
+        nvgFillPaint(vg, paint);
+        nvgFill(vg);
+    }
+
+    /** Frees surfaces nobody drew for a while (their widget is gone or hidden). Called once per frame. */
+    void collectSurfaces() {
+        surfaces.values().removeIf(surface -> {
+            if (frame - surface.lastFrame > 300) {
+                surface.free(vg);
+                return true;
+            }
+            return false;
+        });
+    }
+
     void free() {
+        surfaces.values().forEach(surface -> surface.free(vg));
+        surfaces.clear();
         for (int handle : images.values()) {
             if (handle > 0) {
                 nvgDeleteImage(vg, handle);
