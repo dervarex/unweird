@@ -77,6 +77,17 @@ public class Text extends Widget {
         return this;
     }
 
+    private int maxLines;
+
+    /** Shows at most {@code lines} lines; the rest is cut off with "…" (0 = no limit). */
+    public Text maxLines(int lines) {
+        if (lines < 0) {
+            throw new IllegalArgumentException("maxLines can't be negative");
+        }
+        maxLines = lines;
+        return this;
+    }
+
     /** Draws the text in this color instead of the theme's. */
     public Text color(Color color) {
         this.color = Objects.requireNonNull(color, "color");
@@ -92,6 +103,7 @@ public class Text extends Widget {
     @Override public Text gap(float pixels) { super.gap(pixels); return this; }
     @Override public Text visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
     @Override public Text enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
+    @Override public Text tooltip(String text) { super.tooltip(text); return this; }
 
     @Override
     protected void update() {
@@ -103,14 +115,14 @@ public class Text extends Widget {
 
     @Override
     protected Size measure(Canvas canvas, float maxWidth) {
-        return canvas.measureText(text, weight(), fontSize(), maxWidth);
+        return canvas.measureText(text, weight(), fontSize(), maxWidth, maxLines);
     }
 
     @Override
     protected void draw(Canvas canvas) {
         Color fill = color != null ? color
                 : resolved == Role.SUBTITLE ? canvas.getTheme().getMutedText() : canvas.getTheme().getText();
-        canvas.text(text, getX(), getY(), getWidth(), weight(), fontSize(), fill, align);
+        canvas.text(text, getX(), getY(), getWidth(), weight(), fontSize(), fill, align, maxLines);
     }
 
     private Canvas.Weight weight() {

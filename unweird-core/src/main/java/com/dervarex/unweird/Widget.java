@@ -39,6 +39,24 @@ public abstract class Widget {
     private boolean visible = true;
     private boolean enabled = true;
 
+    private volatile String tooltip;
+
+    /** A hint shown when the mouse rests on this widget for a moment. {@code null} removes it. */
+    public Widget tooltip(String text) {
+        tooltip = text == null || text.isBlank() ? null : text;
+        return this;
+    }
+
+    /** The tooltip text, or null. */
+    public String tooltipText() {
+        return tooltip;
+    }
+
+    /** Hovered for its tooltip only (it doesn't take clicks or focus). */
+    final boolean hoverOnly() {
+        return visible && tooltip != null && !interactive();
+    }
+
     /** Shows this widget only while {@code condition} is true; hidden widgets take no space. */
     public Widget visibleIf(BooleanSupplier condition) {
         visibleIf = Objects.requireNonNull(condition, "condition");
@@ -276,7 +294,7 @@ public abstract class Widget {
 
     /** The innermost interactive widget at the given point, or {@code null}. */
     Widget hitTest(float px, float py) {
-        return interactive() && contains(px, py) ? this : null;
+        return (interactive() || hoverOnly()) && contains(px, py) ? this : null;
     }
 
     final boolean contains(float px, float py) {

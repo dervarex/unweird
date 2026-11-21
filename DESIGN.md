@@ -90,6 +90,13 @@ public class Example {
 | `Component` | `class Sidebar extends Component { ... }` | Your own groups of widgets; `@Card` draws one on a padded surface |
 | `Each<T>` | `new Each<>(() -> results, ResultRow::new)` | One widget per item of a live list; rows keep their state while their item stays |
 
+Text basics:
+- `new Text(...).maxLines(2)` cuts long text with "…"; wrapping is unweird's own, so measuring and drawing always agree.
+- `.tooltip("...")` on any widget: shown after resting the mouse for a moment, hidden on click, key or scroll.
+- Fields have undo/redo: Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y. A run of typing (a word and its space) is one step.
+- Characters Noto Sans lacks fall back to Noto Sans Symbols 2, Noto Sans Math (arrows, math) and Noto Emoji
+  (monochrome). For CJK or other scripts add one: `Unweird.app(...).fallbackFont("/fonts/NotoSansJP-Regular.ttf")`.
+
 Every widget can be shown or enabled conditionally, re-evaluated after every event:
 `.visibleIf(() -> ...)` (hidden widgets take no space) and `.enabledIf(() -> ...)` (dimmed, no input, skipped by Tab).
 
@@ -357,13 +364,13 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
 | **M5** ✅ | Scrolling pages, checkbox, toggle, dropdown (overlay layer), list, image, `Each`, `@Card`, `visibleIf`/`enabledIf`; `unweird-components` with `LoginForm` |
 | **M6** ✅ | `unweird-install`: generic `Source` → `Installer` (verified downloads, dependencies, archives, honest installed state) + `ContentBrowser`; Modrinth source in the example |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
+| **M7** ✅ | Foundations: custom-widget input API (`Slider` built on it), window options (`Unweird.app(...)`), dialogs, toasts, `async`, timers, `@Shortcut`/`focus()`, tooltips, `maxLines`, field undo, fallback fonts |
 | **3D** | `unweird-3d` (branch `3d-rendering`): a 3D viewport widget inside normal layouts, e.g. a Minecraft skin viewer or a 3D world editor; meshes, textures, camera controls |
 
 ## Open points
 
 - `Field` label: placeholder for now; a floating label could come with `unweird-anim`.
-- Undo/redo in fields (Ctrl+Z): not yet.
-- Emoji and scripts Noto Sans doesn't cover show as boxes; a fallback font (NanoVG supports fallbacks) would fix it.
+- Color emoji (NanoVG renders monochrome glyphs only).
 - `unweird-install`: update checks, "adopt" files that were already in the folder (via the source looking up hashes),
   and an "Installed" tab in `ContentBrowser`.
 - Default ordering when several components dock on the same side.

@@ -100,6 +100,7 @@ public class Button extends Widget {
     @Override public Button gap(float pixels) { super.gap(pixels); return this; }
     @Override public Button visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
     @Override public Button enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
+    @Override public Button tooltip(String text) { super.tooltip(text); return this; }
 
     @Override
     protected void update() {

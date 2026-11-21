@@ -85,7 +85,7 @@ public class ItemCard extends Component {
         Details(ItemCard card) {
             Item item = card.item;
             this.title = new Text(item.title());
-            this.description = new Text(item.description() == null ? "" : item.description().strip());
+            this.description = new Text(item.description() == null ? "" : item.description().strip()).maxLines(2);
             this.meta = new Text(card::meta).muted();
         }
     }

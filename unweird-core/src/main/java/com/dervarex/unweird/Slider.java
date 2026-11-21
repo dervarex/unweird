@@ -82,6 +82,7 @@ public class Slider extends Widget {
     @Override public Slider gap(float pixels) { super.gap(pixels); return this; }
     @Override public Slider visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
     @Override public Slider enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
+    @Override public Slider tooltip(String text) { super.tooltip(text); return this; }
 
     private double snap(double raw) {
         double clamped = Math.max(min, Math.min(max, raw));

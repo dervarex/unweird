@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.nanovg.NanoVG.nvgAddFallbackFontId;
 import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
 import static org.lwjgl.nanovg.NanoVG.nvgCreateFontMem;
 import static org.lwjgl.nanovg.NanoVG.nvgEndFrame;
@@ -48,6 +49,7 @@ final class Window implements Host {
     private final java.util.EnumMap<Cursor, Long> cursors = new java.util.EnumMap<>(Cursor.class);
     private final ByteBuffer regularFontData;
     private final ByteBuffer semiboldFontData;
+    private final List<ByteBuffer> fallbackData = new java.util.ArrayList<>();
     private final Canvas canvas;
     private final AtomicBoolean dirty = new AtomicBoolean(true);
     private final Queue<Runnable> uiTasks = new ConcurrentLinkedQueue<>();
@@ -66,6 +68,12 @@ final class Window implements Host {
     /** Open overlays, bottom to top. The top one gets input. */
     private final List<Overlay> overlays = new java.util.ArrayList<>();
     private int pressedButton = -1;
+    private Widget tooltipFor;
+    private boolean tooltipShown;
+    private float tooltipX;
+    private float tooltipY;
+    private Runnable tooltipTimer;
+    private static final double TOOLTIP_DELAY = 0.6;
     private double lastDragX;
     private double lastDragY;
     private double nextBlink;
@@ -150,6 +158,27 @@ final class Window implements Host {
         int semibold = nvgCreateFontMem(vg, "semibold", semiboldFontData, false);
         if (regular < 0 || semibold < 0) {
             throw new IllegalStateException("unweird: could not load the bundled fonts");
+        }
+        // characters Noto Sans does not have: symbols, arrows and math, emoji, then whatever the app adds (CJK, ...)
+        List<String> fallbacks = new java.util.ArrayList<>(List.of(FONT_DIR + "NotoSansSymbols2-Regular.ttf", FONT_DIR + "NotoSansMath-Regular.ttf", FONT_DIR + "NotoEmoji.ttf"));
+        fallbacks.addAll(app.fallbackFonts);
+        for (String resource : fallbacks) {
+            ByteBuffer data;
+            try {
+                data = loadResource(resource.startsWith("/") ? resource : "/" + resource);
+            } catch (RuntimeException e) {
+                System.err.println("unweird: can't load fallback font " + resource + ": " + e.getMessage());
+                continue;
+            }
+            int font = nvgCreateFontMem(vg, "fallback-" + fallbackData.size(), data, false);
+            if (font < 0) {
+                MemoryUtil.memFree(data);
+                System.err.println("unweird: " + resource + " isn't a font NanoVG can read");
+                continue;
+            }
+            fallbackData.add(data);
+            nvgAddFallbackFontId(vg, regular, font);
+            nvgAddFallbackFontId(vg, semibold, font);
         }
         canvas = new Canvas(vg, regular, semibold, theme);
 
@@ -385,6 +414,7 @@ final class Window implements Host {
         nvgDelete(vg);
         MemoryUtil.memFree(regularFontData);
         MemoryUtil.memFree(semiboldFontData);
+        fallbackData.forEach(MemoryUtil::memFree);
         cursors.values().forEach(cursor -> {
             if (cursor != NULL) {
                 glfwDestroyCursor(cursor);
@@ -432,6 +462,7 @@ final class Window implements Host {
             overlay.draw(canvas);
         }
         drawToasts(logicalWidth, logicalHeight);
+        drawTooltip(logicalWidth, logicalHeight);
         nvgEndFrame(vg);
         glfwSwapBuffers(handle);
 
@@ -492,7 +523,8 @@ final class Window implements Host {
                     closeOverlay(top); // a click outside a popup only closes it
                     return;
                 }
-                if (hovered == null) {
+                hideTooltip();
+                if (hovered == null || !hovered.interactive()) {
                     if (top == null || !top.modal()) {
                         focus(null, false); // clicking empty space drops focus
                     }
@@ -528,6 +560,7 @@ final class Window implements Host {
                 return;
             }
             resetBlink();
+            hideTooltip();
             int code = layoutKey(key, scancode);
             Overlay top = topOverlay();
             if (code == GLFW_KEY_TAB) {
@@ -564,6 +597,7 @@ final class Window implements Host {
             dirty.set(true);
         });
         glfwSetScrollCallback(handle, (window, dx, dy) -> {
+            hideTooltip();
             Pointer at = pointer(Pointer.Button.NONE, 0, 0, 0);
             for (Widget w = hovered; w != null; w = w.parent) { // the widget under the mouse first, then its parents
                 Widget candidate = w;
@@ -625,11 +659,61 @@ final class Window implements Host {
             if (target != null) {
                 target.hovered = true;
             }
+            armTooltip(target);
             dirty.set(true);
         }
         // while dragging (e.g. a text selection), keep the pressed widget's cursor even outside it
         Widget shapeSource = pressed != null ? pressed : hovered;
         glfwSetCursor(handle, shapeSource == null ? NULL : cursorHandle(shapeSource.cursor()));
+    }
+
+    private void armTooltip(Widget target) {
+        hideTooltip();
+        if (target == null || target.tooltipText() == null || pressed != null) {
+            return;
+        }
+        tooltipFor = target;
+        tooltipTimer = schedule(TOOLTIP_DELAY, () -> {
+            if (hovered == target && pressed == null && target.tooltipText() != null) {
+                tooltipShown = true;
+                tooltipX = logical(cursorX);
+                tooltipY = logical(cursorY);
+            }
+        });
+    }
+
+    private void hideTooltip() {
+        if (tooltipTimer != null) {
+            tooltipTimer.run();
+            tooltipTimer = null;
+        }
+        if (tooltipShown) {
+            dirty.set(true);
+        }
+        tooltipShown = false;
+        tooltipFor = null;
+    }
+
+    private void drawTooltip(float windowWidth, float windowHeight) {
+        Widget target = tooltipFor;
+        if (!tooltipShown || target == null || target != hovered) {
+            return;
+        }
+        String text = target.tooltipText();
+        if (text == null) {
+            return;
+        }
+        var theme = canvas.getTheme();
+        Size size = canvas.measureText(text, Canvas.Weight.REGULAR, 13, 280);
+        float width = size.width() + 20;
+        float height = size.height() + 12;
+        float x = Math.max(6, Math.min(tooltipX + 12, windowWidth - width - 6));
+        float y = tooltipY + 22;
+        if (y + height > windowHeight - 6) {
+            y = tooltipY - height - 10; // no room below the cursor: show it above
+        }
+        canvas.fillRect(x, y, width, height, 6, theme.getText().withAlpha(0.92f));
+        canvas.text(text, x + 10, y + 6, size.width(), Canvas.Weight.REGULAR, 13, theme.getBackground(), Canvas.Align.LEFT);
     }
 
     private long cursorHandle(Cursor cursor) {

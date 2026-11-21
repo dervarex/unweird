@@ -86,6 +86,7 @@ public class Dropdown<T> extends Widget {
     @Override public Dropdown<T> gap(float pixels) { super.gap(pixels); return this; }
     @Override public Dropdown<T> visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
     @Override public Dropdown<T> enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
+    @Override public Dropdown<T> tooltip(String text) { super.tooltip(text); return this; }
 
     String labelOf(T option) {
         return String.valueOf(labels.apply(option));

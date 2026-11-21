@@ -86,6 +86,7 @@ public class ListView<T> extends Widget {
     @Override public ListView<T> gap(float pixels) { super.gap(pixels); return this; }
     @Override public ListView<T> visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
     @Override public ListView<T> enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
+    @Override public ListView<T> tooltip(String text) { super.tooltip(text); return this; }
 
     String labelOf(T item) {
         return String.valueOf(labels.apply(item));

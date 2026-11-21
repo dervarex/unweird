@@ -41,6 +41,16 @@ public class Field extends Widget {
     /** The other end of the selection; equals {@link #caret} when nothing is selected. */
     private int anchor;
 
+    /** Undo/redo history. A run of typing counts as one step. */
+    private record Snapshot(String value, int caret, int anchor) {
+    }
+
+    private static final int HISTORY = 200;
+    private final java.util.ArrayDeque<Snapshot> undo = new java.util.ArrayDeque<>();
+    private final java.util.ArrayDeque<Snapshot> redo = new java.util.ArrayDeque<>();
+    /** The last edit was typing a non-space character, so the next one can join its undo step. */
+    private boolean typingRun;
+
     /** Horizontal scroll of the text inside the field, so the caret stays visible. */
     private float scroll;
     /** Caret positions of the last drawn display text, used to map mouse x to a char index. */
@@ -56,10 +66,13 @@ public class Field extends Widget {
         return value;
     }
 
-    /** Replaces the content and puts the caret at the end. */
+    /** Replaces the content and puts the caret at the end. Clears undo history. */
     public Field value(String value) {
         this.value = Objects.requireNonNull(value, "value");
         caret = anchor = value.length();
+        undo.clear();
+        redo.clear();
+        typingRun = false;
         return this;
     }
 
@@ -94,6 +107,7 @@ public class Field extends Widget {
     @Override public Field gap(float pixels) { super.gap(pixels); return this; }
     @Override public Field visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
     @Override public Field enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
+    @Override public Field tooltip(String text) { super.tooltip(text); return this; }
 
     // ---- selection helpers (package-private for tests) ----
 
@@ -139,7 +153,10 @@ public class Field extends Widget {
         if (Character.isISOControl(codePoint)) {
             return;
         }
-        replaceSelection(Character.toString(codePoint), host);
+        String text = Character.toString(codePoint);
+        boolean joins = typingRun && !hasSelection(); // a space still joins the word before it, then ends the run
+        replaceSelection(text, host, !joins);
+        typingRun = !Character.isWhitespace(codePoint);
     }
 
     @Override
@@ -194,6 +211,14 @@ public class Field extends Widget {
                         anchor = 0;
                         caret = value.length();
                     }
+                    case GLFW_KEY_Z -> {
+                        if (shift) {
+                            redo(host);
+                        } else {
+                            undo(host);
+                        }
+                    }
+                    case GLFW_KEY_Y -> redo(host);
                     case GLFW_KEY_C -> {
                         if (!masked && hasSelection()) {
                             host.clipboard(selectedText());
@@ -254,7 +279,36 @@ public class Field extends Widget {
         caret = value.length();
     }
 
+    private void undo(Host host) {
+        if (undo.isEmpty()) {
+            return;
+        }
+        redo.push(snapshot());
+        restore(undo.pop(), host);
+    }
+
+    private void redo(Host host) {
+        if (redo.isEmpty()) {
+            return;
+        }
+        undo.push(snapshot());
+        restore(redo.pop(), host);
+    }
+
+    private Snapshot snapshot() {
+        return new Snapshot(value, caret, anchor);
+    }
+
+    private void restore(Snapshot snapshot, Host host) {
+        value = snapshot.value();
+        caret = snapshot.caret();
+        anchor = snapshot.anchor();
+        typingRun = false;
+        fireChange(host);
+    }
+
     private void moveTo(int index, boolean extendSelection) {
+        typingRun = false;
         caret = index;
         if (!extendSelection) {
             anchor = index;
@@ -262,13 +316,30 @@ public class Field extends Widget {
     }
 
     private void replaceSelection(String insert, Host host) {
+        replaceSelection(insert, host, true);
+        typingRun = false;
+    }
+
+    /** @param newStep start a new undo step (false: join the current typing run) */
+    private void replaceSelection(String insert, Host host, boolean newStep) {
         int start = selectionStart();
         int end = selectionEnd();
         if (start == end && insert.isEmpty()) {
             return;
         }
+        if (newStep || undo.isEmpty()) {
+            undo.push(snapshot());
+            while (undo.size() > HISTORY) {
+                undo.removeLast();
+            }
+        }
+        redo.clear();
         value = value.substring(0, start) + insert + value.substring(end);
         caret = anchor = start + insert.length();
+        fireChange(host);
+    }
+
+    private void fireChange(Host host) {
         String current = value;
         for (Consumer<String> handler : changeHandlers) {
             host.safely(this, () -> handler.accept(current));

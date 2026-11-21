@@ -197,7 +197,7 @@ public abstract class Container extends Widget {
                 return hit;
             }
         }
-        return interactive() ? this : null;
+        return interactive() || hoverOnly() ? this : null;
     }
 
     /** All focusable widgets inside this container, in Tab order (declaration order, depth first). */

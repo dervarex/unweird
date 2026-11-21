@@ -27,6 +27,7 @@ public final class App {
     String icon;
     boolean remember;
     boolean maximized;
+    final java.util.List<String> fallbackFonts = new java.util.ArrayList<>();
 
     App(String name) {
         this.name = name;
@@ -67,6 +68,15 @@ public final class App {
     /** Starts maximized (unless {@link #remember()} knows better). */
     public App maximized() {
         this.maximized = true;
+        return this;
+    }
+
+    /**
+     * Another font (classpath resource, e.g. {@code "/fonts/NotoSansJP-Regular.ttf"}) to draw characters the built-in
+     * fonts don't have, such as Chinese or Japanese. Emoji and common symbols are already covered.
+     */
+    public App fallbackFont(String resource) {
+        fallbackFonts.add(Objects.requireNonNull(resource, "resource"));
         return this;
     }
 

@@ -142,6 +142,7 @@ public class Image extends Widget {
     @Override public Image gap(float pixels) { super.gap(pixels); return this; }
     @Override public Image visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
     @Override public Image enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
+    @Override public Image tooltip(String text) { super.tooltip(text); return this; }
 
     @Override
     protected Size measure(Canvas canvas, float maxWidth) {

@@ -13,7 +13,9 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -86,14 +88,18 @@ public final class Canvas {
 
     /** Size of {@code text} wrapped at {@code maxWidth}. */
     public Size measureText(String text, Weight weight, float size, float maxWidth) {
-        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-        if (text.isEmpty()) {
-            return new Size(0, (float) Math.ceil(size * LINE_HEIGHT));
+        return measureText(text, weight, size, maxWidth, 0);
+    }
+
+    /** Size of {@code text} wrapped at {@code maxWidth}, cut to {@code maxLines} lines (0 = no limit). */
+    public Size measureText(String text, Weight weight, float size, float maxWidth, int maxLines) {
+        List<Line> lines = lines(text, weight, size, maxWidth, maxLines);
+        float width = 0;
+        for (Line line : lines) {
+            width = Math.max(width, line.width());
         }
-        nvgTextBoxBounds(vg, 0, 0, Math.max(1, maxWidth), text, bounds);
         // +1 so drawing at exactly the measured width never wraps because of float rounding
-        float width = (float) Math.ceil(bounds[2] - bounds[0]) + 1;
-        return new Size(Math.min(width, maxWidth), (float) Math.ceil(bounds[3] - bounds[1]));
+        return new Size(Math.min((float) Math.ceil(width) + 1, Math.max(0, maxWidth)), (float) Math.ceil(lines.size() * size * LINE_HEIGHT));
     }
 
     /** Width of {@code text} on a single line. */
@@ -104,12 +110,114 @@ public final class Canvas {
 
     /** Draws {@code text} with its top-left at (x, y), wrapped at {@code width} and aligned within it. */
     public void text(String text, float x, float y, float width, Weight weight, float size, Color fill, Align align) {
+        text(text, x, y, width, weight, size, fill, align, 0);
+    }
+
+    /** Like {@link #text(String, float, float, float, Weight, float, Color, Align)}, cut to {@code maxLines} lines with "…". */
+    public void text(String text, float x, float y, float width, Weight weight, float size, Color fill, Align align, int maxLines) {
         if (text.isEmpty()) {
             return;
         }
+        List<Line> lines = lines(text, weight, size, width <= 0 ? UNBOUNDED : width, maxLines);
         font(weight, size, nvgAlign(align) | NVG_ALIGN_TOP);
         nvgFillColor(vg, nvg(fill, color));
-        nvgTextBox(vg, x, y, width <= 0 ? UNBOUNDED : width, text);
+        float lineHeight = size * LINE_HEIGHT;
+        float anchorX = switch (align) {
+            case LEFT -> x;
+            case CENTER -> x + width / 2;
+            case RIGHT -> x + width;
+        };
+        for (int i = 0; i < lines.size(); i++) {
+            nvgText(vg, anchorX, y + i * lineHeight, lines.get(i).text());
+        }
+    }
+
+    /** One wrapped line and its width. */
+    record Line(String text, float width) {
+    }
+
+    private record WrapKey(String text, Weight weight, float size, float width, int maxLines) {
+    }
+
+    /** Recent wraps; measuring and drawing ask for the same ones every frame. */
+    private final Map<WrapKey, List<Line>> wraps = new java.util.LinkedHashMap<>(256, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<WrapKey, List<Line>> eldest) {
+            return size() > 512;
+        }
+    };
+
+    /** Greedy word wrap: breaks at spaces, breaks words that don't fit on their own, keeps '\n' breaks. */
+    List<Line> lines(String text, Weight weight, float size, float maxWidth, int maxLines) {
+        WrapKey key = new WrapKey(text, weight, size, maxWidth, maxLines);
+        List<Line> cached = wraps.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        float limit = Math.max(1, maxWidth);
+        List<String> out = new ArrayList<>();
+        for (String paragraph : text.split("\n", -1)) {
+            StringBuilder line = new StringBuilder();
+            for (String token : paragraph.split("(?<=\\s)")) {
+                if (token.isEmpty()) {
+                    continue;
+                }
+                String candidate = line + token;
+                if (advance(candidate.stripTrailing()) <= limit) {
+                    line.append(token);
+                    continue;
+                }
+                if (!line.isEmpty()) {
+                    out.add(line.toString().stripTrailing());
+                    line.setLength(0);
+                }
+                // the token alone may still be too wide: break it by characters
+                String rest = token;
+                while (advance(rest.stripTrailing()) > limit) {
+                    int cut = fitting(rest, limit);
+                    out.add(rest.substring(0, cut));
+                    rest = rest.substring(cut);
+                }
+                line.append(rest);
+            }
+            out.add(line.toString().stripTrailing());
+        }
+        List<Line> lines = new ArrayList<>();
+        boolean cut = maxLines > 0 && out.size() > maxLines;
+        int count = cut ? maxLines : out.size();
+        for (int i = 0; i < count; i++) {
+            String content = cut && i == count - 1 ? ellipsize(out.get(i), limit) : out.get(i);
+            lines.add(new Line(content, advance(content)));
+        }
+        List<Line> result = List.copyOf(lines);
+        wraps.put(key, result);
+        return result;
+    }
+
+    /** How many chars of {@code text} fit into {@code limit} (at least one code point). */
+    private int fitting(String text, float limit) {
+        int end = text.offsetByCodePoints(0, 1);
+        while (end < text.length()) {
+            int next = text.offsetByCodePoints(end, 1);
+            if (advance(text.substring(0, next)) > limit) {
+                break;
+            }
+            end = next;
+        }
+        return end;
+    }
+
+    private String ellipsize(String line, float limit) {
+        String shortened = line;
+        while (!shortened.isEmpty() && advance(shortened.stripTrailing() + "…") > limit) {
+            shortened = shortened.substring(0, shortened.offsetByCodePoints(shortened.length(), -1));
+        }
+        return shortened.stripTrailing() + "…";
+    }
+
+    private float advance(String text) {
+        return text.isEmpty() ? 0 : nvgTextBounds(vg, 0, 0, text, bounds);
     }
 
     /** Draws a single line of text centered on (centerX, centerY). */

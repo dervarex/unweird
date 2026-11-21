@@ -22,6 +22,7 @@ public class AboutScreen extends Screen {
     Text m5 = new Text("M5: checkboxes, toggles, dropdowns, lists, images, scrolling, and ready-made components.");
     Text why = new Text("Why the name? Because most UI toolkits feel a little weird: string IDs, layout code "
             + "everywhere, and listeners wired by hand. This one tries to read like a description of the screen.");
-    Text font = new Text("Text is set in Noto Sans, licensed under the SIL Open Font License.");
+    Text font = new Text("Text is set in Noto Sans, licensed under the SIL Open Font License. "
+            + "Emoji and symbols fall back to Noto Emoji, Noto Sans Symbols 2 and Noto Sans Math: ✓ ★ → ⚡ 🎉 🧱 ⛏");
     Text end = new Text("You scrolled all the way down. That's the whole story so far.");
 }

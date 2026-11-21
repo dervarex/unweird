@@ -18,5 +18,7 @@ public class Header extends Component {
 
     Text greeting = new Text(() -> "Hi, " + user);
 
-    @Getter private final Button logout = new Button("Log out").onClick(() -> go(LoginScreen.class));
+    @Getter private final Button logout = new Button("Log out")
+            .tooltip("Back to the sign-in screen. Ctrl+Q quits the app.")
+            .onClick(() -> go(LoginScreen.class));
 }
