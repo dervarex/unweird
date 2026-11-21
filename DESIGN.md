@@ -74,6 +74,25 @@ public class Example {
   Getters exist so others can read or style the parts, not rewire them.
 - `onClick(...)` etc. return `this` so a widget can be declared in one expression.
 
+## Widgets
+
+| Widget | Example | Notes |
+|---|---|---|
+| `Text` | `new Text("Hi")`, `new Text(() -> "Hi " + name)` | Role inferred (heading / title / subtitle / body) |
+| `Button` | `new Button("Save").onClick(...)`, `new Button(() -> label)` | Variant inferred; `primary/secondary/ghost/danger()` |
+| `Field` | `new Field("Username").masked().onSubmit(...)` | Single-line input, see "Text input" |
+| `Checkbox` | `new Checkbox("Remember me").onChange(on -> ...)` | `checked()`, Space toggles |
+| `Toggle` | `new Toggle("Dark mode").checked(true)` | Label left, switch right |
+| `Dropdown<T>` | `new Dropdown<>("Language", List.of(...)).labels(...)` | Popup above everything; keyboard-driven too |
+| `ListView<T>` | `new ListView<>(() -> tasks).onSelect(...)` | Live items; arrows select; `empty("...")` text |
+| `Image` | `new Image("/images/logo.png").size(56, 56)` | Classpath or `Image.file(path)`; placeholder if missing |
+| `Component` | `class Sidebar extends Component { ... }` | Your own groups of widgets |
+
+All widgets support the relational overrides (`below`, `rightOf`, `alignRight`, `gap`, ...) and return their own type,
+so they chain at the declaration.
+
+Pages taller than the window scroll (mouse wheel, thin scrollbar); Tab scrolls the focused widget into view.
+
 ## Screens
 
 - One class per screen, extending `Screen`.
@@ -220,7 +239,7 @@ A relation to a text that's currently empty (hidden) is ignored until that text 
 | **M2** ✅ | `Field`: typing, cursor, selection, clipboard, masking, scrolling, blinking caret; focus & Tab; keyboard-activated buttons; empty texts collapse |
 | **M3** ✅ | `go(...)`, screen caching, `@Fresh`, `onShow`/`onHide`; `@Default` docking, `@Without`, `shared(...)`; compile-time `@Default` checks |
 | **M4** ✅ | Card/page inference, components laid out like screens, button-row variants; relational overrides; theme switching, explicit variants and text styles |
-| **M5** | More widgets: checkbox, toggle, dropdown, list, image, scroll container; first `unweird-components` |
+| **M5** 🚧 | ✅ scrolling pages, checkbox, toggle, dropdown (overlay layer), list, image · ⏳ first `unweird-components` (`LoginForm`) |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
 
 ## Open points

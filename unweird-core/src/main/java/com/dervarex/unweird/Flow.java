@@ -22,7 +22,7 @@ import java.util.function.Predicate;
  *
  * Inside both, content is a column of rows:
  * <ul>
- *   <li>The first text is a heading (a title inside components); a text right after it is a muted subtitle.</li>
+ *   <li>The first text (after any leading images) is a heading, a title inside components; a text right after it is a muted subtitle.</li>
  *   <li>Consecutive buttons share a row; the first is primary, the others secondary.</li>
  *   <li>Empty texts take no space.</li>
  *   <li>Overrides: {@code below/above} move a widget, {@code rightOf/leftOf} join another widget's row,
@@ -95,7 +95,8 @@ final class Flow {
                 if (!formLike(nested)) {
                     return false;
                 }
-            } else if (!(child instanceof Text || isInput(child) || child instanceof Button || child instanceof Choice<?>)) {
+            } else if (!(child instanceof Text || child instanceof Field || child instanceof Dropdown<?>
+                    || child instanceof Button || child instanceof Choice<?> || child instanceof Image)) {
                 return false;
             }
         }
@@ -235,12 +236,15 @@ final class Flow {
     static void inferRoles(Container container, List<Widget> order) {
         boolean card = container.flowMode == Mode.CARD;
         Widget previous = null;
+        boolean onlyImagesSoFar = true; // a logo above the first text doesn't stop it from being the heading
         for (int i = 0; i < order.size(); i++) {
             Widget widget = order.get(i);
+            boolean leading = onlyImagesSoFar;
+            onlyImagesSoFar &= widget instanceof Image;
             if (widget instanceof Text text) {
                 if (text.role != Text.Role.AUTO) {
                     text.resolved = text.role;
-                } else if (i == 0) {
+                } else if (leading) {
                     text.resolved = container.headingRole;
                 } else if (previous instanceof Text above && (above.resolved == Text.Role.HEADING || above.resolved == Text.Role.TITLE)) {
                     text.resolved = Text.Role.SUBTITLE;
@@ -251,7 +255,7 @@ final class Flow {
             } else if (widget instanceof Container nested) {
                 nested.flowMode = container.flowMode;
                 // a component that opens a screen without its own heading carries the heading
-                nested.headingRole = i == 0 && container.headingRole == Text.Role.HEADING ? Text.Role.HEADING : Text.Role.TITLE;
+                nested.headingRole = leading && container.headingRole == Text.Role.HEADING ? Text.Role.HEADING : Text.Role.TITLE;
             }
             previous = widget;
         }
@@ -295,7 +299,7 @@ final class Flow {
         float[] widths = new float[row.size()];
         if (row.size() == 1) {
             Widget only = row.getFirst();
-            boolean natural = only.alignment != null || (only instanceof Button && mode == Mode.PAGE);
+            boolean natural = only.alignment != null || only instanceof Image || (only instanceof Button && mode == Mode.PAGE);
             widths[0] = natural ? only.measure(canvas, width).width() : width;
             return widths;
         }
@@ -363,9 +367,9 @@ final class Flow {
         }
     }
 
-    /** Fields and dropdowns: boxes you fill in, which stretch to the available width. */
+    /** Fields, dropdowns and lists: boxes you fill in or pick from, which stretch to the available width. */
     private static boolean isInput(Widget widget) {
-        return widget instanceof Field || widget instanceof Dropdown<?>;
+        return widget instanceof Field || widget instanceof Dropdown<?> || widget instanceof ListView<?>;
     }
 
     private static float itemGap(Widget widget) {

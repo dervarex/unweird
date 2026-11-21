@@ -152,6 +152,11 @@ public abstract class Widget {
     void mouseDown(float px, float py, int clicks, boolean shift) {
     }
 
+    /** The mouse moved over this widget (only called for the hovered interactive widget). Returns whether anything visible changed. */
+    boolean mouseMoved(float px, float py) {
+        return false;
+    }
+
     /** Mouse moved while the button is held after {@link #mouseDown}. */
     void mouseDrag(float px, float py) {
     }

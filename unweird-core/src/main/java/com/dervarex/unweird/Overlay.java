@@ -21,11 +21,6 @@ abstract class Overlay extends Widget {
         return false;
     }
 
-    /** The mouse moved over the overlay. Returns whether anything visible changed. */
-    boolean mouseMoved(float px, float py) {
-        return false;
-    }
-
     @Override
     protected boolean clickable() {
         return true;

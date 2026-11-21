@@ -5,6 +5,7 @@ import com.dervarex.example.components.Sidebar;
 import com.dervarex.unweird.Button;
 import com.dervarex.unweird.Checkbox;
 import com.dervarex.unweird.Field;
+import com.dervarex.unweird.Image;
 import com.dervarex.unweird.Screen;
 import com.dervarex.unweird.Text;
 import com.dervarex.unweird.annotation.State;
@@ -17,6 +18,7 @@ public class LoginScreen extends Screen {
 
     @State String message = "";
 
+    Image logo    = new Image("/images/logo.png").size(56, 56);
     Text heading  = new Text("Welcome back");
     Text greeting = new Text(this::greeting);            // live: updates while you type
     Field user    = new Field("Username");

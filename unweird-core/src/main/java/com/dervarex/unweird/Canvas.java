@@ -13,6 +13,9 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Supplier;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 
@@ -37,6 +40,8 @@ public final class Canvas {
     private final NVGColor color2 = NVGColor.malloc();
     private final NVGPaint paint = NVGPaint.malloc();
     private final float[] bounds = new float[4];
+    /** Loaded images by source; -1 marks a source that failed to load (reported once). */
+    private final Map<String, Integer> images = new HashMap<>();
 
     @Getter
     @Setter(AccessLevel.PACKAGE)
@@ -207,6 +212,52 @@ public final class Canvas {
         nvgStroke(vg);
     }
 
+    /**
+     * The renderer's handle for an image, loading it on first use. {@code bytes} supplies the encoded file
+     * (PNG, JPEG, ...) and is only called once per {@code source}. Returns -1 if it can't be loaded.
+     */
+    int image(String source, Supplier<byte[]> bytes) {
+        Integer known = images.get(source);
+        if (known != null) {
+            return known;
+        }
+        int handle = -1;
+        try {
+            byte[] data = bytes.get();
+            ByteBuffer buffer = MemoryUtil.memAlloc(data.length);
+            try {
+                buffer.put(data).flip();
+                handle = nvgCreateImageMem(vg, 0, buffer);
+            } finally {
+                MemoryUtil.memFree(buffer); // NanoVG has uploaded the decoded pixels by now
+            }
+            if (handle <= 0) {
+                handle = -1;
+                System.err.println("unweird: can't decode image " + source + " (PNG, JPEG, BMP, GIF and TGA work)");
+            }
+        } catch (RuntimeException e) {
+            System.err.println("unweird: can't load image " + source + ": " + e.getMessage());
+        }
+        images.put(source, handle);
+        return handle;
+    }
+
+    /** Pixel size of a loaded image, {width, height}. */
+    int[] imageSize(int handle) {
+        int[] w = new int[1];
+        int[] h = new int[1];
+        nvgImageSize(vg, handle, w, h);
+        return new int[]{w[0], h[0]};
+    }
+
+    void drawImage(int handle, float x, float y, float width, float height, float radius) {
+        nvgImagePattern(vg, x, y, width, height, 0, handle, 1, paint);
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, radius);
+        nvgFillPaint(vg, paint);
+        nvgFill(vg);
+    }
+
     /** Restricts drawing to the given rectangle until {@link #unclip()}. Calls must be balanced. */
     public void clip(float x, float y, float width, float height) {
         nvgSave(vg);
@@ -218,6 +269,12 @@ public final class Canvas {
     }
 
     void free() {
+        for (int handle : images.values()) {
+            if (handle > 0) {
+                nvgDeleteImage(vg, handle);
+            }
+        }
+        images.clear();
         color.free();
         color2.free();
         paint.free();

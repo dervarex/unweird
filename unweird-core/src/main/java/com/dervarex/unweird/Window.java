@@ -255,10 +255,10 @@ final class Window implements Host {
                 resetBlink();
                 dirty.set(true);
             }
-            if (overlay != null && overlay.contains(logical(x), logical(y)) && overlay.mouseMoved(logical(x), logical(y))) {
+            updateHover();
+            if (hovered != null && hovered.mouseMoved(logical(x), logical(y))) {
                 dirty.set(true);
             }
-            updateHover();
         });
         glfwSetCursorEnterCallback(handle, (window, entered) -> {
             if (!entered) {
