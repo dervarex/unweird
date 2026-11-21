@@ -301,6 +301,11 @@ final class Window implements Host {
             }
             dirty.set(true);
         });
+        glfwSetScrollCallback(handle, (window, dx, dy) -> {
+            if (screen != null && screen.scrollBy(logical(cursorX), logical(cursorY), dy)) {
+                dirty.set(true);
+            }
+        });
         glfwSetFramebufferSizeCallback(handle, (window, w, h) -> dirty.set(true));
         glfwSetWindowContentScaleCallback(handle, (window, sx, sy) -> dirty.set(true));
         glfwSetWindowRefreshCallback(handle, window -> render());
@@ -372,6 +377,7 @@ final class Window implements Host {
             field.selectAllForTab();
         }
         focus(target, true);
+        screen.reveal(target);
     }
 
     private void resetBlink() {

@@ -30,6 +30,14 @@ class LayoutTest {
         Button plus = new Button("+").rightOf(counter);
     }
 
+    static class RememberRow extends Screen {
+        Field pass = new Field("Password");
+        Button forgot = new Button("Forgot?").ghost().alignRight(pass);
+        Checkbox remember = new Checkbox("Remember me").leftOf(forgot).alignLeft(pass);
+        Button signIn = new Button("Sign in");
+        Button help = new Button("Help");
+    }
+
     static class Section extends Component {
         Text title = new Text("Profile");
         Text hint = new Text("Shown to others");
@@ -80,6 +88,16 @@ class LayoutTest {
         List<List<Widget>> rows = Flow.rows(s, Flow.reorder(s, s.children()));
         assertTrue(rows.contains(List.of(s.forgot)), rows.toString());
         assertTrue(rows.contains(List.of(s.signIn)), rows.toString());
+    }
+
+    @Test
+    void positionedButtonsDontPullFollowingButtonsIntoTheirRow() {
+        RememberRow s = new RememberRow();
+        List<List<Widget>> rows = Flow.rows(s, Flow.reorder(s, s.children()));
+        assertEquals(List.of(
+                List.of(s.pass),
+                List.of(s.remember, s.forgot),
+                List.of(s.signIn, s.help)), rows);
     }
 
     @Test

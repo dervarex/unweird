@@ -2,9 +2,13 @@ package com.dervarex.unweird;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * The inferred content layout (see DESIGN.md, "Layout").
@@ -36,6 +40,7 @@ final class Flow {
     private static final float OUTER_MARGIN = 24;
     private static final float PAGE_WIDTH = 640;
     private static final float PAGE_TOP = 40;
+    private static final float PAGE_BOTTOM = 40;
     private static final float ROW_ITEM_GAP = 8;
 
     private Flow() {
@@ -50,6 +55,10 @@ final class Flow {
 
         screen.card = false;
         screen.headingRole = Text.Role.HEADING;
+        screen.contentX = areaX;
+        screen.contentY = areaY;
+        screen.contentWidth = areaWidth;
+        screen.contentHeight = areaHeight;
 
         if (formLike(screen)) {
             float cardWidth = Math.min(CARD_CONTENT_WIDTH + CARD_PADDING * 2, areaWidth - OUTER_MARGIN * 2);
@@ -64,6 +73,8 @@ final class Flow {
                 screen.cardX = areaX + (areaWidth - cardWidth) / 2;
                 screen.cardY = areaY + (areaHeight - cardHeight) / 2;
                 column(screen, canvas, contentWidth, true, screen.cardX + CARD_PADDING, screen.cardY + CARD_PADDING);
+                screen.scrollMax = 0;
+                screen.scrollY = 0;
                 return;
             }
         }
@@ -71,7 +82,10 @@ final class Flow {
         screen.flowMode = Mode.PAGE;
         float width = Math.max(0, Math.min(PAGE_WIDTH, areaWidth - OUTER_MARGIN * 2));
         float top = Math.min(PAGE_TOP, Math.max(OUTER_MARGIN, areaHeight * 0.06f));
-        column(screen, canvas, width, true, areaX + (areaWidth - width) / 2, areaY + top);
+        float height = column(screen, canvas, width, false, 0, 0);
+        screen.scrollMax = Math.max(0, top + height + PAGE_BOTTOM - areaHeight);
+        screen.scrollY = Math.max(0, Math.min(screen.scrollY, screen.scrollMax));
+        column(screen, canvas, width, true, areaX + (areaWidth - width) / 2, areaY + top - screen.scrollY);
     }
 
     /** Only texts, fields and buttons, possibly grouped in components: the kind of content that sits on a card. */
@@ -81,7 +95,7 @@ final class Flow {
                 if (!formLike(nested)) {
                     return false;
                 }
-            } else if (!(child instanceof Text || child instanceof Field || child instanceof Button)) {
+            } else if (!(child instanceof Text || child instanceof Field || child instanceof Button || child instanceof Choice<?>)) {
                 return false;
             }
         }
@@ -166,13 +180,20 @@ final class Flow {
     static List<List<Widget>> rows(Container container, List<Widget> order) {
         List<List<Widget>> rows = new ArrayList<>();
         List<Widget> joining = new ArrayList<>();
+        Set<Widget> joined = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Widget widget : order) {
+            if (widget.relation == Widget.Relation.RIGHT_OF || widget.relation == Widget.Relation.LEFT_OF) {
+                joined.add(widget.relationTarget);
+            }
+        }
+        Predicate<Widget> grouped = w -> autoGroupedButton(w) && !joined.contains(w);
         for (Widget widget : order) {
             if (widget.relation == Widget.Relation.RIGHT_OF || widget.relation == Widget.Relation.LEFT_OF) {
                 joining.add(widget);
                 continue;
             }
             List<Widget> last = rows.isEmpty() ? null : rows.getLast();
-            if (autoGroupedButton(widget) && last != null && last.stream().allMatch(Flow::autoGroupedButton)) {
+            if (grouped.test(widget) && last != null && last.stream().allMatch(grouped)) {
                 last.add(widget);
             } else {
                 rows.add(new ArrayList<>(List.of(widget)));
@@ -191,8 +212,9 @@ final class Flow {
         return rows;
     }
 
+    /** Buttons group into rows automatically, unless the developer positioned them explicitly. */
     private static boolean autoGroupedButton(Widget widget) {
-        return widget instanceof Button && widget.relation == null;
+        return widget instanceof Button && widget.relation == null && widget.alignment == null;
     }
 
     /** Resolves a relation target among the visible children, or explains why it can't be. */
@@ -251,10 +273,16 @@ final class Flow {
         if (a instanceof Field && b instanceof Field) {
             return 10;
         }
+        if (a instanceof Choice<?> && b instanceof Choice<?>) {
+            return 8;
+        }
+        if (a instanceof Field && b instanceof Choice<?>) {
+            return 12;
+        }
         if (a instanceof Text && (b instanceof Field || b instanceof Button)) {
             return mode == Mode.CARD ? 28 : 20;
         }
-        if (a instanceof Field && b instanceof Button) {
+        if ((a instanceof Field || a instanceof Choice<?>) && b instanceof Button) {
             return 20;
         }
         return 16;

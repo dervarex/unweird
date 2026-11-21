@@ -24,6 +24,16 @@ public abstract class Screen extends Container {
     float cardWidth;
     float cardHeight;
 
+    /** The area left for content after docking, and how far it is scrolled. Set by {@link Flow}. */
+    float contentX;
+    float contentY;
+    float contentWidth;
+    float contentHeight;
+    float scrollY;
+    float scrollMax;
+
+    private static final float SCROLL_STEP = 48;
+
     /** Called every time this screen becomes visible, including the first time. */
     protected void onShow() {
     }
@@ -64,6 +74,7 @@ public abstract class Screen extends Container {
         for (DockSlot slot : docks) {
             slot.component.draw(canvas);
         }
+        canvas.clip(contentX, contentY, contentWidth, contentHeight);
         if (card) {
             float radius = canvas.getTheme().getRadius() * 2;
             canvas.shadow(cardX, cardY, cardWidth, cardHeight, radius, 24, canvas.getTheme().getShadow());
@@ -71,6 +82,52 @@ public abstract class Screen extends Container {
             canvas.strokeRect(cardX, cardY, cardWidth, cardHeight, radius, 1, canvas.getTheme().getBorder());
         }
         super.draw(canvas);
+        if (scrollMax > 0) {
+            float thumb = Math.max(32, contentHeight * contentHeight / (contentHeight + scrollMax));
+            float thumbY = contentY + (contentHeight - thumb) * (scrollY / scrollMax);
+            canvas.fillRect(contentX + contentWidth - 7, thumbY + 2, 4, thumb - 4, 2, canvas.getTheme().getMutedText().withAlpha(0.35f));
+        }
+        canvas.unclip();
+    }
+
+    /** Scrolls the content by mouse-wheel steps if the point is over it. Returns whether anything moved. */
+    boolean scrollBy(float px, float py, double steps) {
+        if (scrollMax <= 0 || !inContent(px, py)) {
+            return false;
+        }
+        float next = (float) Math.max(0, Math.min(scrollMax, scrollY - steps * SCROLL_STEP));
+        if (next == scrollY) {
+            return false;
+        }
+        scrollY = next;
+        return true;
+    }
+
+    /** Scrolls just enough to show {@code widget} (as last laid out), if it is part of the content. */
+    void reveal(Widget widget) {
+        if (scrollMax <= 0 || !isContent(widget)) {
+            return;
+        }
+        float margin = 16;
+        if (widget.getY() < contentY) {
+            scrollY -= contentY - widget.getY() + margin;
+        } else if (widget.getY() + widget.getHeight() > contentY + contentHeight) {
+            scrollY += widget.getY() + widget.getHeight() - (contentY + contentHeight) + margin;
+        }
+        scrollY = Math.max(0, Math.min(scrollY, scrollMax));
+    }
+
+    private boolean inContent(float px, float py) {
+        return px >= contentX && py >= contentY && px < contentX + contentWidth && py < contentY + contentHeight;
+    }
+
+    private boolean isContent(Widget widget) {
+        for (Widget w = widget; w != null; w = w.parent) {
+            if (w == this) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -81,7 +138,7 @@ public abstract class Screen extends Container {
                 return hit;
             }
         }
-        return super.hitTest(px, py);
+        return inContent(px, py) ? super.hitTest(px, py) : null;
     }
 
     /** Tab order for the whole window: top and left docks, the content, then right and bottom docks. */

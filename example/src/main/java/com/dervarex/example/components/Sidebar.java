@@ -1,5 +1,6 @@
 package com.dervarex.example.components;
 
+import com.dervarex.example.screens.AboutScreen;
 import com.dervarex.example.screens.HomeScreen;
 import com.dervarex.example.screens.SettingsScreen;
 import com.dervarex.unweird.Button;
@@ -16,4 +17,5 @@ public class Sidebar extends Component {
 
     @Getter private final Button home     = new Button("Home").onClick(() -> go(HomeScreen.class));
     @Getter private final Button settings = new Button("Settings").onClick(() -> go(SettingsScreen.class));
+    @Getter private final Button about    = new Button("About").onClick(() -> go(AboutScreen.class));
 }

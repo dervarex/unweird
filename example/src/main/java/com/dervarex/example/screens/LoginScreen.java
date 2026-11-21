@@ -3,6 +3,7 @@ package com.dervarex.example.screens;
 import com.dervarex.example.components.Header;
 import com.dervarex.example.components.Sidebar;
 import com.dervarex.unweird.Button;
+import com.dervarex.unweird.Checkbox;
 import com.dervarex.unweird.Field;
 import com.dervarex.unweird.Screen;
 import com.dervarex.unweird.Text;
@@ -20,13 +21,14 @@ public class LoginScreen extends Screen {
     Text greeting = new Text(this::greeting);            // live: updates while you type
     Field user    = new Field("Username");
     Field pass    = new Field("Password").masked().onSubmit(this::signIn);
+
+    // one row: the checkbox lined up with the fields' left edge, the link with their right edge
+    Button forgot = new Button("Forgot password?").ghost().alignRight(pass).gap(4)
+            .onClick(() -> message = "Try \"hunter2\".");
+    Checkbox remember = new Checkbox("Remember me").leftOf(forgot).alignLeft(pass);
+
     Button signIn = new Button("Sign in").onClick(this::signIn);
     Text status   = new Text(() -> message);
-
-    // declared last, but shown right under the password field, lined up with its right edge
-    Button forgot = new Button("Forgot password?").ghost()
-            .below(pass).alignRight(pass).gap(4)
-            .onClick(() -> message = "Try \"hunter2\".");
 
     @Override
     protected void onShow() {

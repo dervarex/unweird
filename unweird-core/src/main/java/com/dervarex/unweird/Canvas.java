@@ -182,6 +182,31 @@ public final class Canvas {
         return xs;
     }
 
+    /** A filled circle. */
+    public void circle(float centerX, float centerY, float radius, Color fill) {
+        nvgBeginPath(vg);
+        nvgCircle(vg, centerX, centerY, radius);
+        nvgFillColor(vg, nvg(fill, color));
+        nvgFill(vg);
+    }
+
+    /** An open line through the given points {x0, y0, x1, y1, ...}, with round joins and caps. */
+    public void polyline(float[] points, float strokeWidth, Color stroke) {
+        if (points.length < 4) {
+            return;
+        }
+        nvgBeginPath(vg);
+        nvgMoveTo(vg, points[0], points[1]);
+        for (int i = 2; i + 1 < points.length; i += 2) {
+            nvgLineTo(vg, points[i], points[i + 1]);
+        }
+        nvgLineCap(vg, NVG_ROUND);
+        nvgLineJoin(vg, NVG_ROUND);
+        nvgStrokeWidth(vg, strokeWidth);
+        nvgStrokeColor(vg, nvg(stroke, color));
+        nvgStroke(vg);
+    }
+
     /** Restricts drawing to the given rectangle until {@link #unclip()}. Calls must be balanced. */
     public void clip(float x, float y, float width, float height) {
         nvgSave(vg);
