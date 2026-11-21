@@ -27,6 +27,9 @@ public class Theme {
     private final Color accent;
     /** Text drawn on top of the accent color. */
     private final Color onAccent;
+    /** Destructive actions, e.g. {@code new Button("Delete").danger()}. */
+    private final Color danger;
+    private final Color onDanger;
     /** Corner radius of buttons and fields; cards use twice this. */
     private final float radius;
 
@@ -40,7 +43,15 @@ public class Theme {
                 Color.hex("#6e6e78"),
                 Color.hex("#5b5bd6"),
                 Color.WHITE,
+                Color.hex("#d93d42"),
+                Color.WHITE,
                 8);
+    }
+
+    /** Whether this is a dark theme (judged by the background's brightness). */
+    public boolean isDark() {
+        float luminance = 0.2126f * background.r() + 0.7152f * background.g() + 0.0722f * background.b();
+        return luminance < 0.5f;
     }
 
     public static Theme dark() {
@@ -52,6 +63,8 @@ public class Theme {
                 Color.hex("#ececf1"),
                 Color.hex("#9c9ca8"),
                 Color.hex("#7c6cff"),
+                Color.WHITE,
+                Color.hex("#e5484d"),
                 Color.WHITE,
                 8);
     }

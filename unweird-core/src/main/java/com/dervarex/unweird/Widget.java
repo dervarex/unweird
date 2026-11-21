@@ -31,6 +31,81 @@ public abstract class Widget {
 
     Container parent;
 
+    // ---- relational overrides (see DESIGN.md, "Layout") ----
+
+    enum Relation { BELOW, ABOVE, RIGHT_OF, LEFT_OF }
+
+    enum Alignment { LEFT, RIGHT }
+
+    Relation relation;
+    Widget relationTarget;
+    Alignment alignment;
+    Widget alignmentTarget;
+    /** Space before this widget, overriding the inferred gap. NaN = inferred. */
+    float gapBefore = Float.NaN;
+
+    /** Places this widget directly below {@code other}, wherever it was declared. */
+    public Widget below(Widget other) {
+        return relate(Relation.BELOW, other);
+    }
+
+    /** Places this widget directly above {@code other}, wherever it was declared. */
+    public Widget above(Widget other) {
+        return relate(Relation.ABOVE, other);
+    }
+
+    /** Puts this widget in the same row as {@code other}, to its right. */
+    public Widget rightOf(Widget other) {
+        return relate(Relation.RIGHT_OF, other);
+    }
+
+    /** Puts this widget in the same row as {@code other}, to its left. */
+    public Widget leftOf(Widget other) {
+        return relate(Relation.LEFT_OF, other);
+    }
+
+    /** Uses its natural width and lines up its left edge with {@code other}'s. */
+    public Widget alignLeft(Widget other) {
+        return align(Alignment.LEFT, other);
+    }
+
+    /** Uses its natural width and lines up its right edge with {@code other}'s. */
+    public Widget alignRight(Widget other) {
+        return align(Alignment.RIGHT, other);
+    }
+
+    /** Space before this widget in logical pixels, instead of the inferred spacing. */
+    public Widget gap(float pixels) {
+        if (pixels < 0 || Float.isNaN(pixels)) {
+            throw new IllegalArgumentException("gap must be zero or positive, got " + pixels);
+        }
+        gapBefore = pixels;
+        return this;
+    }
+
+    private Widget relate(Relation kind, Widget other) {
+        relation = kind;
+        relationTarget = checkTarget(other);
+        return this;
+    }
+
+    private Widget align(Alignment kind, Widget other) {
+        alignment = kind;
+        alignmentTarget = checkTarget(other);
+        return this;
+    }
+
+    private Widget checkTarget(Widget other) {
+        if (other == null) {
+            throw new IllegalArgumentException("Can't position a " + getClass().getSimpleName() + " relative to null "
+                    + "(is the other widget declared further down? Declare it first)");
+        }
+        if (other == this) {
+            throw new IllegalArgumentException("A widget can't be positioned relative to itself");
+        }
+        return other;
+    }
+
     /** Re-evaluates lambdas such as {@code new Text(() -> ...)}. Runs before every layout. */
     protected void update() {
     }

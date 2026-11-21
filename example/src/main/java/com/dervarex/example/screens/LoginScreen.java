@@ -23,6 +23,11 @@ public class LoginScreen extends Screen {
     Button signIn = new Button("Sign in").onClick(this::signIn);
     Text status   = new Text(() -> message);
 
+    // declared last, but shown right under the password field, lined up with its right edge
+    Button forgot = new Button("Forgot password?").ghost()
+            .below(pass).alignRight(pass).gap(4)
+            .onClick(() -> message = "Try \"hunter2\".");
+
     @Override
     protected void onShow() {
         pass.value("");   // never keep a password around after logging out

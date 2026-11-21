@@ -140,40 +140,53 @@ If the index is missing, startup fails with a message that names the
 Default rule: **you shouldn't need to write layout code for a normal screen.**
 The engine looks at the content (declaration order plus widget types) and picks a layout.
 
-### Inference rules (v1 draft)
+### Inference rules
 
 1. **Regions:** docked defaults take their edges, and the rest is the content area.
-2. **Flow:** content flows top to bottom in declaration order.
-3. **Heading:** if the first widget is a `Text`, it is styled as a heading.
-   A `Text` directly after the heading becomes a muted subtitle.
-4. **Groups:** consecutive widgets of the same kind are grouped, with tighter spacing
-   inside a group and larger spacing between groups.
-   Consecutive `Button`s form a horizontal button row.
-5. **Short-form detection:** if the content is only Text/Field/Button and fits
-   the content area, it is centered as a card with a readable max width (~360px).
-   That is the classic login look, with zero code.
-6. **Otherwise** content is top-aligned with a comfortable max width and side padding.
+2. **Card or page:** content that is *form-like* (only texts, fields and buttons, also inside components)
+   and fits is centered on a **card** (~360px wide; texts centered; single buttons full width).
+   Anything else, or content too tall for the window, becomes a **page**: a top-aligned column up to 640px wide,
+   texts left-aligned, buttons at their natural width.
+3. **Flow:** content flows top to bottom in declaration order, as rows.
+4. **Heading:** the first `Text` of a screen is a heading; inside a component it's a section title
+   (unless that component opens the screen, then it carries the heading). A `Text` right after a heading
+   or title is a muted subtitle; other texts are body text.
+5. **Groups:** consecutive `Button`s share a row. On a card they split the width evenly; on a page they keep their
+   natural width. The first button in a row is primary, the others secondary.
+   Spacing is tighter inside groups (heading → subtitle 6px, field → field 10px) and larger between them.
+6. **Empty texts take no space**, so a status line appears only when it has something to say.
+7. **Components** in the content use these same rules, so a form looks the same whether its widgets sit
+   directly on the screen or inside a `Component`.
 
 ### Overrides (relational, type-checked)
 
-Use these only for what the inference got wrong:
+Use these only for what the inference got wrong. They return the widget itself, so they chain right
+where it's declared:
 
 ```java
-signIn.alignRight(pass);
-subtitle.below(heading).gap(4);
-counter.rightOf(plus);
-heading.centerIn(this);
+Button forgot = new Button("Forgot password?").ghost()
+        .below(pass).alignRight(pass).gap(4);
 ```
 
-Any widget with an override is pinned by it, and everything else keeps flowing.
-Explicit styling like `new Text("x").heading()` also overrides inference.
+| Call | Effect |
+|---|---|
+| `below(x)` / `above(x)` | Moved directly below/above `x`, wherever it was declared. |
+| `rightOf(x)` / `leftOf(x)` | Joins `x`'s row, next to it. |
+| `alignLeft(x)` / `alignRight(x)` | Natural width, edge lined up with `x`'s. |
+| `gap(px)` | Space before it, instead of the inferred spacing. |
+
+A relation to a widget that's not in the same screen or component is an error when the screen is laid out.
+A relation to a text that's currently empty (hidden) is ignored until that text has content.
 
 ## Styling
 
-- One `Theme` object holds colors, fonts, spacing, corner radius, and an accent color.
-- Built-in `Theme.light()` and `Theme.dark()`. Write your own by extending `Theme` or tweaking a built-in:
-  `Unweird.theme(Theme.dark().withAccent(Color.hex("#7c5cff")))`.
-- Per-widget tweaks in Java: `logout.style(s -> s.variant(DANGER))`.
+- One `Theme` object holds colors and corner radius. Built-in `Theme.light()` and `Theme.dark()`;
+  tweak one with Lombok withers, `Theme.dark().withAccent(Color.hex("#7c5cff"))`, or build your own with the constructor.
+  Switch at runtime with `Unweird.theme(...)`; `Unweird.theme()` returns the current one.
+- Per widget, explicit look beats inference. Short calls instead of style lambdas:
+  - `Button`: `primary()`, `secondary()`, `ghost()`, `danger()`
+  - `Text`: `heading()`, `title()`, `body()`, `muted()`, `color(Color)`
+- Buttons can have live labels, too: `new Button(() -> dark ? "Light mode" : "Dark mode")`.
 - No CSS files.
 
 ## Runtime & threading
@@ -206,7 +219,7 @@ Explicit styling like `new Text("x").heading()` also overrides inference.
 | **M1** ✅ | Window + NanoVG + bundled font (Noto Sans); `Text` and `Button` drawn; annotation processor + auto-added fields; simple flow layout (centered card, heading/subtitle inference, button rows); lambdas re-evaluated on every redraw; hover/press/click |
 | **M2** ✅ | `Field`: typing, cursor, selection, clipboard, masking, scrolling, blinking caret; focus & Tab; keyboard-activated buttons; empty texts collapse |
 | **M3** ✅ | `go(...)`, screen caching, `@Fresh`, `onShow`/`onHide`; `@Default` docking, `@Without`, `shared(...)`; compile-time `@Default` checks |
-| **M4** | Full inference rules + relational overrides; `Theme` light/dark/custom, `style(...)` |
+| **M4** ✅ | Card/page inference, components laid out like screens, button-row variants; relational overrides; theme switching, explicit variants and text styles |
 | **M5** | More widgets: checkbox, toggle, dropdown, list, image, scroll container; first `unweird-components` |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
 

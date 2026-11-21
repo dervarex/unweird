@@ -16,12 +16,14 @@ import java.util.Set;
  */
 public abstract class Container extends Widget {
 
-    private static final float GAP = 8;
-
     private List<Widget> manual;
     private List<Widget> children;
     /** Set while this container is docked on a screen edge; switches to {@link Docking}'s layout. */
     Docking.Axis dockAxis;
+    /** How the surrounding content is laid out; set by {@link Flow} before measuring. */
+    Flow.Mode flowMode = Flow.Mode.PAGE;
+    /** What the first text in this container becomes, if not set explicitly. */
+    Text.Role headingRole = Text.Role.TITLE;
 
     /** Shows exactly these widgets, in this order, instead of the declared fields. Can be called repeatedly. */
     protected final void add(Widget... widgets) {
@@ -82,22 +84,13 @@ public abstract class Container extends Widget {
         }
     }
 
-    /** Default layout: children stacked top to bottom at full width. */
+    /** Inside content, a container takes the full width and lays its children out like a screen would (see {@link Flow}). */
     @Override
     protected Size measure(Canvas canvas, float maxWidth) {
         if (dockAxis != null) {
             return Docking.measure(this, canvas, maxWidth);
         }
-        float width = 0;
-        float height = 0;
-        List<Widget> kids = children();
-        for (Widget child : kids) {
-            Size size = child.measure(canvas, maxWidth);
-            width = Math.max(width, size.width());
-            height += size.height();
-        }
-        height += GAP * Math.max(0, kids.size() - 1);
-        return new Size(width, height);
+        return new Size(maxWidth, Flow.column(this, canvas, maxWidth, false, 0, 0));
     }
 
     @Override
@@ -106,12 +99,7 @@ public abstract class Container extends Widget {
             Docking.arrange(this, canvas);
             return;
         }
-        float cy = getY();
-        for (Widget child : children()) {
-            float h = child.measure(canvas, getWidth()).height();
-            child.place(canvas, getX(), cy, getWidth(), h);
-            cy += h + GAP;
-        }
+        Flow.column(this, canvas, getWidth(), true, getX(), getY());
     }
 
     @Override

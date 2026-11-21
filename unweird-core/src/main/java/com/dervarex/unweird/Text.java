@@ -1,5 +1,7 @@
 package com.dervarex.unweird;
 
+import com.dervarex.unweird.style.Color;
+
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -22,6 +24,8 @@ public class Text extends Widget {
     /** What the layout decided. */
     Role resolved = Role.BODY;
     Canvas.Align align = Canvas.Align.LEFT;
+    /** Explicit color; null = from the theme. */
+    private Color color;
 
     public Text(String text) {
         this.text = Objects.requireNonNull(text, "text");
@@ -50,11 +54,37 @@ public class Text extends Widget {
         return this;
     }
 
+    /** Always style this as a section title (smaller than a heading). */
+    public Text title() {
+        role = Role.TITLE;
+        return this;
+    }
+
     /** Always style this as normal body text. */
     public Text body() {
         role = Role.BODY;
         return this;
     }
+
+    /** Always style this as secondary, muted text. */
+    public Text muted() {
+        role = Role.SUBTITLE;
+        return this;
+    }
+
+    /** Draws the text in this color instead of the theme's. */
+    public Text color(Color color) {
+        this.color = Objects.requireNonNull(color, "color");
+        return this;
+    }
+
+    @Override public Text below(Widget other) { super.below(other); return this; }
+    @Override public Text above(Widget other) { super.above(other); return this; }
+    @Override public Text rightOf(Widget other) { super.rightOf(other); return this; }
+    @Override public Text leftOf(Widget other) { super.leftOf(other); return this; }
+    @Override public Text alignLeft(Widget other) { super.alignLeft(other); return this; }
+    @Override public Text alignRight(Widget other) { super.alignRight(other); return this; }
+    @Override public Text gap(float pixels) { super.gap(pixels); return this; }
 
     @Override
     protected void update() {
@@ -71,8 +101,9 @@ public class Text extends Widget {
 
     @Override
     protected void draw(Canvas canvas) {
-        var color = resolved == Role.SUBTITLE ? canvas.getTheme().getMutedText() : canvas.getTheme().getText();
-        canvas.text(text, getX(), getY(), getWidth(), weight(), fontSize(), color, align);
+        Color fill = color != null ? color
+                : resolved == Role.SUBTITLE ? canvas.getTheme().getMutedText() : canvas.getTheme().getText();
+        canvas.text(text, getX(), getY(), getWidth(), weight(), fontSize(), fill, align);
     }
 
     private Canvas.Weight weight() {

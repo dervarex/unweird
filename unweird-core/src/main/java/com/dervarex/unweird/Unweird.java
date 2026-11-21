@@ -56,6 +56,11 @@ public final class Unweird {
         return Defaults.shared(Objects.requireNonNull(type, "type"));
     }
 
+    /** The current theme. */
+    public static Theme theme() {
+        return theme;
+    }
+
     /** Switches the theme, e.g. {@code Unweird.theme(Theme.dark())}. Call before {@link #start} or from the UI thread. */
     public static void theme(Theme next) {
         theme = Objects.requireNonNull(next, "theme");

@@ -163,7 +163,7 @@ final class Docking {
                 titled = true;
                 text.align = Canvas.Align.LEFT;
             } else if (child instanceof Button button) {
-                button.variant = Button.Variant.GHOST;
+                button.resolved = button.variant != null ? button.variant : Button.Variant.GHOST;
                 button.alignStart = axis == Axis.VERTICAL;
             }
         }

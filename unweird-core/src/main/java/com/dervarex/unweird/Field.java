@@ -85,6 +85,14 @@ public class Field extends Widget {
         return this;
     }
 
+    @Override public Field below(Widget other) { super.below(other); return this; }
+    @Override public Field above(Widget other) { super.above(other); return this; }
+    @Override public Field rightOf(Widget other) { super.rightOf(other); return this; }
+    @Override public Field leftOf(Widget other) { super.leftOf(other); return this; }
+    @Override public Field alignLeft(Widget other) { super.alignLeft(other); return this; }
+    @Override public Field alignRight(Widget other) { super.alignRight(other); return this; }
+    @Override public Field gap(float pixels) { super.gap(pixels); return this; }
+
     // ---- selection helpers (package-private for tests) ----
 
     int caret() {

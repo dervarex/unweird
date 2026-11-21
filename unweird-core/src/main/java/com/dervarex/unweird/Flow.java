@@ -1,26 +1,42 @@
 package com.dervarex.unweird;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * The M1 screen layout: everything flows top to bottom on a centered card.
+ * The inferred content layout (see DESIGN.md, "Layout").
  *
+ * <p>A screen's content becomes either
  * <ul>
- *   <li>The first {@link Text} becomes a heading, a text right after it a subtitle.</li>
- *   <li>Consecutive {@link Button}s share one row; consecutive {@link Field}s form a tight block.</li>
- *   <li>The card is vertically centered when it fits, otherwise it starts at the top.</li>
- *   <li>Empty texts take no space, so a status line appears only once it says something.</li>
+ *   <li>a <b>card</b>: centered, ~360px wide, texts centered, buttons full width. Used when the content is
+ *       form-like (only texts, fields and buttons, also inside components) and fits the window; or</li>
+ *   <li>a <b>page</b>: a top-aligned column up to 640px wide, texts left-aligned, buttons at their natural width.</li>
  * </ul>
  *
- * The full inference rules and relational overrides replace this in M4 (see DESIGN.md).
+ * Inside both, content is a column of rows:
+ * <ul>
+ *   <li>The first text is a heading (a title inside components); a text right after it is a muted subtitle.</li>
+ *   <li>Consecutive buttons share a row; the first is primary, the others secondary.</li>
+ *   <li>Empty texts take no space.</li>
+ *   <li>Overrides: {@code below/above} move a widget, {@code rightOf/leftOf} join another widget's row,
+ *       {@code alignLeft/alignRight} line up edges, {@code gap} replaces the inferred spacing.</li>
+ * </ul>
+ * Components inside the content are laid out with the same rules, so a login form looks the same whether
+ * its widgets sit directly on the screen or in a {@link Component}.
  */
 final class Flow {
+
+    enum Mode { CARD, PAGE }
 
     private static final float CARD_CONTENT_WIDTH = 360;
     private static final float CARD_PADDING = 32;
     private static final float OUTER_MARGIN = 24;
-    private static final float BUTTON_GAP = 8;
+    private static final float PAGE_WIDTH = 640;
+    private static final float PAGE_TOP = 40;
+    private static final float ROW_ITEM_GAP = 8;
 
     private Flow() {
     }
@@ -31,124 +47,306 @@ final class Flow {
         float areaY = area[1];
         float areaWidth = area[2];
         float areaHeight = area[3];
-        // An empty text (e.g. a status message nobody has set yet) takes no space.
-        List<Widget> children = new ArrayList<>();
-        for (Widget child : screen.children()) {
-            if (child instanceof Text text && text.text().isEmpty()) {
-                child.place(canvas, areaX, areaY, 0, 0);
-            } else {
-                children.add(child);
-            }
-        }
-        screen.card = !children.isEmpty();
-        if (!screen.card) {
-            return;
-        }
 
-        inferTextRoles(children);
-        List<List<Widget>> rows = rows(children);
+        screen.card = false;
+        screen.headingRole = Text.Role.HEADING;
 
-        float cardWidth = Math.min(CARD_CONTENT_WIDTH + CARD_PADDING * 2, areaWidth - OUTER_MARGIN * 2);
-        float contentWidth = Math.max(0, cardWidth - CARD_PADDING * 2);
-
-        float[] heights = new float[rows.size()];
-        float total = 0;
-        for (int i = 0; i < rows.size(); i++) {
-            heights[i] = rowHeight(rows.get(i), canvas, contentWidth);
-            total += heights[i];
-            if (i > 0) {
-                total += gap(rows.get(i - 1), rows.get(i));
+        if (formLike(screen)) {
+            float cardWidth = Math.min(CARD_CONTENT_WIDTH + CARD_PADDING * 2, areaWidth - OUTER_MARGIN * 2);
+            float contentWidth = Math.max(0, cardWidth - CARD_PADDING * 2);
+            screen.flowMode = Mode.CARD;
+            float contentHeight = column(screen, canvas, contentWidth, false, 0, 0);
+            float cardHeight = contentHeight + CARD_PADDING * 2;
+            if (contentHeight > 0 && cardHeight <= areaHeight - OUTER_MARGIN * 2) {
+                screen.card = true;
+                screen.cardWidth = cardWidth;
+                screen.cardHeight = cardHeight;
+                screen.cardX = areaX + (areaWidth - cardWidth) / 2;
+                screen.cardY = areaY + (areaHeight - cardHeight) / 2;
+                column(screen, canvas, contentWidth, true, screen.cardX + CARD_PADDING, screen.cardY + CARD_PADDING);
+                return;
             }
         }
 
-        float cardHeight = total + CARD_PADDING * 2;
-        float freeHeight = areaHeight - OUTER_MARGIN * 2;
-        screen.cardWidth = cardWidth;
-        screen.cardHeight = cardHeight;
-        screen.cardX = areaX + (areaWidth - cardWidth) / 2;
-        screen.cardY = areaY + (cardHeight <= freeHeight ? (areaHeight - cardHeight) / 2 : OUTER_MARGIN);
-
-        float x = screen.cardX + CARD_PADDING;
-        float y = screen.cardY + CARD_PADDING;
-        for (int i = 0; i < rows.size(); i++) {
-            if (i > 0) {
-                y += gap(rows.get(i - 1), rows.get(i));
-            }
-            placeRow(rows.get(i), canvas, x, y, contentWidth, heights[i]);
-            y += heights[i];
-        }
+        screen.flowMode = Mode.PAGE;
+        float width = Math.max(0, Math.min(PAGE_WIDTH, areaWidth - OUTER_MARGIN * 2));
+        float top = Math.min(PAGE_TOP, Math.max(OUTER_MARGIN, areaHeight * 0.06f));
+        column(screen, canvas, width, true, areaX + (areaWidth - width) / 2, areaY + top);
     }
 
-    private static void inferTextRoles(List<Widget> children) {
-        Widget previous = null;
-        for (int i = 0; i < children.size(); i++) {
-            if (children.get(i) instanceof Text text) {
-                if (text.role != Text.Role.AUTO) {
-                    text.resolved = text.role;
-                } else if (i == 0) {
-                    text.resolved = Text.Role.HEADING;
-                } else if (previous instanceof Text above && above.resolved == Text.Role.HEADING) {
-                    text.resolved = Text.Role.SUBTITLE;
-                } else {
-                    text.resolved = Text.Role.BODY;
+    /** Only texts, fields and buttons, possibly grouped in components: the kind of content that sits on a card. */
+    static boolean formLike(Container container) {
+        for (Widget child : container.children()) {
+            if (child instanceof Container nested) {
+                if (!formLike(nested)) {
+                    return false;
                 }
-                text.align = Canvas.Align.CENTER;
+            } else if (!(child instanceof Text || child instanceof Field || child instanceof Button)) {
+                return false;
             }
-            previous = children.get(i);
         }
+        return true;
     }
 
-    /** Groups consecutive buttons into one row; everything else gets its own row. */
-    private static List<List<Widget>> rows(List<Widget> children) {
-        List<List<Widget>> rows = new ArrayList<>();
-        for (Widget child : children) {
-            List<Widget> last = rows.isEmpty() ? null : rows.getLast();
-            if (child instanceof Button && last != null && last.getFirst() instanceof Button) {
-                last.add(child);
+    /**
+     * Measures ({@code place = false}) or places the children of {@code container} as a column of rows,
+     * {@code width} wide, starting at (x, y). Returns the column's height.
+     */
+    static float column(Container container, Canvas canvas, float width, boolean place, float x, float y) {
+        Mode mode = container.flowMode;
+        List<Widget> visible = new ArrayList<>();
+        for (Widget child : container.children()) {
+            if (child instanceof Text text && text.text().isEmpty()) {
+                if (place) {
+                    child.place(canvas, x, y, 0, 0);
+                }
             } else {
-                rows.add(new ArrayList<>(List.of(child)));
+                visible.add(child);
+            }
+        }
+        if (visible.isEmpty()) {
+            return 0;
+        }
+
+        List<Widget> order = reorder(container, visible);
+        inferRoles(container, order);
+        List<List<Widget>> rows = rows(container, order);
+
+        float height = 0;
+        for (int i = 0; i < rows.size(); i++) {
+            List<Widget> row = rows.get(i);
+            if (i > 0) {
+                height += gap(rows.get(i - 1), row, mode);
+            }
+            float[] widths = widths(row, canvas, width, mode);
+            float rowHeight = 0;
+            for (int j = 0; j < row.size(); j++) {
+                rowHeight = Math.max(rowHeight, row.get(j).measure(canvas, widths[j]).height());
+            }
+            if (place) {
+                placeRow(row, widths, canvas, x, y + height, width, rowHeight, mode);
+            }
+            height += rowHeight;
+        }
+
+        if (place) {
+            for (Widget widget : order) {
+                applyAlignment(widget, canvas);
+            }
+        }
+        return height;
+    }
+
+    // ---- order and rows ----
+
+    /** Applies {@code below/above}: moves widgets next to their target, keeping several moves to one target in declaration order. */
+    static List<Widget> reorder(Container container, List<Widget> visible) {
+        List<Widget> order = new ArrayList<>(visible);
+        Map<Widget, Widget> lastBelow = new HashMap<>();
+        for (Widget widget : visible) {
+            if (widget.relation != Widget.Relation.BELOW && widget.relation != Widget.Relation.ABOVE) {
+                continue;
+            }
+            Widget target = target(container, widget, widget.relationTarget, visible);
+            if (target == null) {
+                continue; // target is hidden right now (an empty text): stay where declared
+            }
+            order.remove(widget);
+            if (widget.relation == Widget.Relation.BELOW) {
+                Widget after = lastBelow.getOrDefault(target, target);
+                order.add(order.indexOf(after) + 1, widget);
+                lastBelow.put(target, widget);
+            } else {
+                order.add(order.indexOf(target), widget);
+            }
+        }
+        return order;
+    }
+
+    static List<List<Widget>> rows(Container container, List<Widget> order) {
+        List<List<Widget>> rows = new ArrayList<>();
+        List<Widget> joining = new ArrayList<>();
+        for (Widget widget : order) {
+            if (widget.relation == Widget.Relation.RIGHT_OF || widget.relation == Widget.Relation.LEFT_OF) {
+                joining.add(widget);
+                continue;
+            }
+            List<Widget> last = rows.isEmpty() ? null : rows.getLast();
+            if (autoGroupedButton(widget) && last != null && last.stream().allMatch(Flow::autoGroupedButton)) {
+                last.add(widget);
+            } else {
+                rows.add(new ArrayList<>(List.of(widget)));
+            }
+        }
+        for (Widget widget : joining) {
+            Widget target = target(container, widget, widget.relationTarget, order);
+            List<Widget> row = target == null ? null : rows.stream().filter(r -> r.contains(target)).findFirst().orElse(null);
+            if (row == null) {
+                rows.add(new ArrayList<>(List.of(widget))); // target hidden or itself joining: own row
+            } else {
+                int index = row.indexOf(target);
+                row.add(widget.relation == Widget.Relation.RIGHT_OF ? index + 1 : index, widget);
             }
         }
         return rows;
     }
 
-    private static float rowHeight(List<Widget> row, Canvas canvas, float width) {
-        float cellWidth = cellWidth(row, width);
-        float height = 0;
-        for (Widget widget : row) {
-            height = Math.max(height, widget.measure(canvas, cellWidth).height());
+    private static boolean autoGroupedButton(Widget widget) {
+        return widget instanceof Button && widget.relation == null;
+    }
+
+    /** Resolves a relation target among the visible children, or explains why it can't be. */
+    private static Widget target(Container container, Widget widget, Widget target, List<Widget> visible) {
+        if (visible.contains(target)) {
+            return target;
         }
-        return height;
+        if (container.children().contains(target)) {
+            return null; // hidden
+        }
+        throw new IllegalStateException("A " + widget.getClass().getSimpleName() + " in " + container.getClass().getName()
+                + " is positioned relative to a " + target.getClass().getSimpleName()
+                + " that isn't in the same screen or component");
     }
 
-    private static void placeRow(List<Widget> row, Canvas canvas, float x, float y, float width, float height) {
-        float cellWidth = cellWidth(row, width);
-        for (Widget widget : row) {
-            widget.place(canvas, x, y, cellWidth, height);
-            x += cellWidth + BUTTON_GAP;
+    // ---- inference ----
+
+    static void inferRoles(Container container, List<Widget> order) {
+        boolean card = container.flowMode == Mode.CARD;
+        Widget previous = null;
+        for (int i = 0; i < order.size(); i++) {
+            Widget widget = order.get(i);
+            if (widget instanceof Text text) {
+                if (text.role != Text.Role.AUTO) {
+                    text.resolved = text.role;
+                } else if (i == 0) {
+                    text.resolved = container.headingRole;
+                } else if (previous instanceof Text above && (above.resolved == Text.Role.HEADING || above.resolved == Text.Role.TITLE)) {
+                    text.resolved = Text.Role.SUBTITLE;
+                } else {
+                    text.resolved = Text.Role.BODY;
+                }
+                text.align = card ? Canvas.Align.CENTER : Canvas.Align.LEFT;
+            } else if (widget instanceof Container nested) {
+                nested.flowMode = container.flowMode;
+                // a component that opens a screen without its own heading carries the heading
+                nested.headingRole = i == 0 && container.headingRole == Text.Role.HEADING ? Text.Role.HEADING : Text.Role.TITLE;
+            }
+            previous = widget;
         }
     }
 
-    private static float cellWidth(List<Widget> row, float width) {
-        return (width - BUTTON_GAP * (row.size() - 1)) / row.size();
-    }
-
-    /** Space between two rows: tight within a heading block, wider between different kinds of content. */
-    private static float gap(List<Widget> above, List<Widget> below) {
+    private static float gap(List<Widget> above, List<Widget> below, Mode mode) {
         Widget a = above.getLast();
         Widget b = below.getFirst();
+        if (!Float.isNaN(b.gapBefore)) {
+            return b.gapBefore;
+        }
+        if (a instanceof Container || b instanceof Container) {
+            return 24;
+        }
         if (a instanceof Text ta && b instanceof Text tb) {
-            return ta.resolved == Text.Role.HEADING && tb.resolved == Text.Role.SUBTITLE ? 6 : 12;
+            boolean headingBlock = (ta.resolved == Text.Role.HEADING || ta.resolved == Text.Role.TITLE) && tb.resolved == Text.Role.SUBTITLE;
+            return headingBlock ? 6 : 12;
         }
         if (a instanceof Field && b instanceof Field) {
-            return 10; // a block of inputs
+            return 10;
         }
         if (a instanceof Text && (b instanceof Field || b instanceof Button)) {
-            return 28; // from the heading block to the form
+            return mode == Mode.CARD ? 28 : 20;
         }
         if (a instanceof Field && b instanceof Button) {
             return 20;
         }
         return 16;
+    }
+
+    // ---- sizing and placing rows ----
+
+    private static float[] widths(List<Widget> row, Canvas canvas, float width, Mode mode) {
+        resolveButtonVariants(row);
+        float[] widths = new float[row.size()];
+        if (row.size() == 1) {
+            Widget only = row.getFirst();
+            boolean natural = only.alignment != null || (only instanceof Button && mode == Mode.PAGE);
+            widths[0] = natural ? only.measure(canvas, width).width() : width;
+            return widths;
+        }
+        float gaps = 0;
+        for (int i = 1; i < row.size(); i++) {
+            gaps += itemGap(row.get(i));
+        }
+        if (mode == Mode.CARD && row.stream().allMatch(w -> w instanceof Button)) {
+            Arrays.fill(widths, Math.max(0, (width - gaps) / row.size()));
+            return widths;
+        }
+        // natural widths; fields (and components) share whatever is left
+        float used = gaps;
+        int flexible = 0;
+        for (int i = 0; i < row.size(); i++) {
+            Widget widget = row.get(i);
+            if (widget instanceof Field || widget instanceof Container) {
+                flexible++;
+            } else {
+                widths[i] = widget.measure(canvas, Math.max(0, width - used)).width();
+                used += widths[i];
+            }
+        }
+        if (flexible > 0) {
+            float share = Math.max(0, (width - used) / flexible);
+            for (int i = 0; i < row.size(); i++) {
+                if (row.get(i) instanceof Field || row.get(i) instanceof Container) {
+                    widths[i] = share;
+                }
+            }
+        }
+        return widths;
+    }
+
+    /** First automatic button in a row is primary, the rest secondary. Explicit variants always win. */
+    static void resolveButtonVariants(List<Widget> row) {
+        boolean primaryTaken = false;
+        for (Widget widget : row) {
+            if (widget instanceof Button button) {
+                if (button.variant != null) {
+                    button.resolved = button.variant;
+                } else {
+                    button.resolved = primaryTaken ? Button.Variant.SECONDARY : Button.Variant.PRIMARY;
+                }
+                button.alignStart = false;
+                primaryTaken |= button.resolved == Button.Variant.PRIMARY;
+            }
+        }
+    }
+
+    private static void placeRow(List<Widget> row, float[] widths, Canvas canvas, float x, float y, float width, float rowHeight, Mode mode) {
+        float total = 0;
+        for (int i = 0; i < row.size(); i++) {
+            total += widths[i] + (i > 0 ? itemGap(row.get(i)) : 0);
+        }
+        float cx = mode == Mode.CARD ? x + Math.max(0, (width - total) / 2) : x;
+        for (int i = 0; i < row.size(); i++) {
+            Widget widget = row.get(i);
+            if (i > 0) {
+                cx += itemGap(widget);
+            }
+            float h = row.size() == 1 ? rowHeight : widget.measure(canvas, widths[i]).height();
+            widget.place(canvas, cx, y + (rowHeight - h) / 2, widths[i], h);
+            cx += widths[i];
+        }
+    }
+
+    private static float itemGap(Widget widget) {
+        return Float.isNaN(widget.gapBefore) ? ROW_ITEM_GAP : widget.gapBefore;
+    }
+
+    private static void applyAlignment(Widget widget, Canvas canvas) {
+        if (widget.alignment == null) {
+            return;
+        }
+        Widget target = widget.alignmentTarget;
+        float x = widget.alignment == Widget.Alignment.LEFT
+                ? target.getX()
+                : target.getX() + target.getWidth() - widget.getWidth();
+        widget.place(canvas, x, widget.getY(), widget.getWidth(), widget.getHeight());
     }
 }
