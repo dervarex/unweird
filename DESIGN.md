@@ -166,7 +166,20 @@ Explicit styling like `new Text("x").heading()` also overrides inference.
 - All handlers run on the UI thread.
 - Rendering is event-driven: the loop waits on `glfwWaitEvents` and only redraws when something changed.
   Continuous rendering comes with `unweird-anim`.
-- Focus: Tab and Shift+Tab move through focusable widgets in declaration order.
+- Focus: Tab and Shift+Tab move through focusable widgets (fields, buttons) in declaration order,
+  including those inside components. Keyboard focus shows a focus ring; tabbing into a field selects its text.
+  The first `Field` on a screen is focused automatically. Clicking empty space removes focus.
+
+## Text input (`Field`)
+
+- `new Field("Username")`: the text is a placeholder shown while the field is empty.
+- `value()` reads, `value("...")` sets. `masked()` shows dots and disables copy/cut.
+- `onChange(value -> ...)` after every edit, `onSubmit(() -> ...)` on Enter.
+- Keys: arrows, Home/End, Backspace/Delete. Ctrl+arrow or Ctrl+Backspace/Delete work on whole words
+  (Alt on macOS). Shift extends the selection. Ctrl+A/C/X/V (Cmd on macOS).
+- Mouse: click places the caret, drag or Shift+click selects, double click selects a word, triple click selects everything.
+- Editing works on code points, so an emoji is never split in half.
+- Buttons react to Enter and Space when focused.
 
 ## Roadmap
 
@@ -174,7 +187,7 @@ Explicit styling like `new Text("x").heading()` also overrides inference.
 |---|---|
 | **M0** ✅ | Multi-module Gradle build, annotations, this document |
 | **M1** ✅ | Window + NanoVG + bundled font (Noto Sans); `Text` and `Button` drawn; annotation processor + auto-added fields; simple flow layout (centered card, heading/subtitle inference, button rows); lambdas re-evaluated on every redraw; hover/press/click |
-| **M2** | `Field`: typing, cursor, selection, clipboard, masking; focus & Tab; lambda re-evaluation after events |
+| **M2** ✅ | `Field`: typing, cursor, selection, clipboard, masking, scrolling, blinking caret; focus & Tab; keyboard-activated buttons; empty texts collapse |
 | **M3** | `go(...)`, screen caching, `@Fresh`, `@Title`; `@Default` docking, `@Without`, `shared(...)` |
 | **M4** | Full inference rules + relational overrides; `Theme` light/dark/custom, `style(...)` |
 | **M5** | More widgets: checkbox, toggle, dropdown, list, image, scroll container; first `unweird-components` |
@@ -182,5 +195,6 @@ Explicit styling like `new Text("x").heading()` also overrides inference.
 
 ## Open points
 
-- `Field` label style: floating label vs. placeholder vs. label above.
+- `Field` label: placeholder for now; a floating label could come with `unweird-anim`.
+- Undo/redo in fields (Ctrl+Z): not yet.
 - Default ordering when several components dock on the same side.

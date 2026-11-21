@@ -6,7 +6,13 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.lwjgl.nanovg.NVGColor;
+import org.lwjgl.nanovg.NVGGlyphPosition;
 import org.lwjgl.nanovg.NVGPaint;
+import org.lwjgl.system.MemoryUtil;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 
@@ -108,6 +114,84 @@ public final class Canvas {
         nvgText(vg, centerX, centerY, text);
     }
 
+    /** Draws a single line of text starting at {@code x}, vertically centered on {@code centerY}. */
+    public void textLine(String text, float x, float centerY, Weight weight, float size, Color fill) {
+        if (text.isEmpty()) {
+            return;
+        }
+        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        nvgFillColor(vg, nvg(fill, color));
+        nvgText(vg, x, centerY, text);
+    }
+
+    /** Height of one line of text at the given size. */
+    public float lineHeight(float size) {
+        return size * LINE_HEIGHT;
+    }
+
+    /**
+     * For a single line of {@code text} drawn at x = 0: the x position of the caret before each char index,
+     * plus one at the end. The result has {@code text.length() + 1} entries.
+     * Indices inside a surrogate pair get the position of the pair's start.
+     */
+    public float[] caretPositions(String text, Weight weight, float size) {
+        float[] xs = new float[text.length() + 1];
+        if (text.isEmpty()) {
+            return xs;
+        }
+        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+
+        byte[] utf8 = text.getBytes(StandardCharsets.UTF_8);
+        int[] charAtByte = new int[utf8.length + 1];
+        for (int i = 0, b = 0; i < text.length(); ) {
+            int cp = text.codePointAt(i);
+            int bytes = utf8Length(cp);
+            Arrays.fill(charAtByte, b, b + bytes, i);
+            b += bytes;
+            i += Character.charCount(cp);
+        }
+        charAtByte[utf8.length] = text.length();
+
+        Arrays.fill(xs, Float.NaN);
+        ByteBuffer buffer = MemoryUtil.memAlloc(utf8.length);
+        NVGGlyphPosition.Buffer glyphs = NVGGlyphPosition.malloc(text.codePointCount(0, text.length()));
+        try {
+            buffer.put(utf8).flip();
+            long start = MemoryUtil.memAddress(buffer);
+            int count = nvgTextGlyphPositions(vg, 0, 0, buffer, glyphs);
+            float end = 0;
+            for (int g = 0; g < count; g++) {
+                NVGGlyphPosition glyph = glyphs.get(g);
+                int index = charAtByte[(int) (glyph.str() - start)];
+                if (Float.isNaN(xs[index])) {
+                    xs[index] = glyph.x();
+                }
+                end = Math.max(end, glyph.maxx());
+            }
+            xs[0] = Float.isNaN(xs[0]) ? 0 : xs[0];
+            xs[text.length()] = end;
+            for (int i = 1; i < text.length(); i++) {
+                if (Float.isNaN(xs[i])) {
+                    xs[i] = xs[i - 1]; // second half of a surrogate pair, or a character without a glyph
+                }
+            }
+        } finally {
+            glyphs.free();
+            MemoryUtil.memFree(buffer);
+        }
+        return xs;
+    }
+
+    /** Restricts drawing to the given rectangle until {@link #unclip()}. Calls must be balanced. */
+    public void clip(float x, float y, float width, float height) {
+        nvgSave(vg);
+        nvgIntersectScissor(vg, x, y, width, height);
+    }
+
+    public void unclip() {
+        nvgRestore(vg);
+    }
+
     void free() {
         color.free();
         color2.free();
@@ -119,6 +203,13 @@ public final class Canvas {
         nvgFontSize(vg, size);
         nvgTextLineHeight(vg, LINE_HEIGHT);
         nvgTextAlign(vg, align);
+    }
+
+    private static int utf8Length(int codePoint) {
+        if (codePoint < 0x80 || Character.isSurrogate((char) codePoint) && codePoint < 0x10000) return 1; // lone surrogate → '?'
+        if (codePoint < 0x800) return 2;
+        if (codePoint < 0x10000) return 3;
+        return 4;
     }
 
     private static int nvgAlign(Align align) {

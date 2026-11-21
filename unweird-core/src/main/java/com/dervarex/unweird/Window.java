@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -30,17 +31,21 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  * Everything here runs on the UI thread, except {@link #requestRender()}.
  *
  * <p>Rendering is event-driven: the loop sleeps in {@code glfwWaitEvents} and only draws
- * when something changed.
+ * when something changed (or a focused field's caret blinks).
  */
-final class Window {
+final class Window implements Host {
 
     private static final int DEFAULT_WIDTH = 960;
     private static final int DEFAULT_HEIGHT = 640;
     private static final String FONT_DIR = "/com/dervarex/unweird/fonts/";
+    private static final double BLINK_SECONDS = 0.53;
+    private static final double MULTI_CLICK_SECONDS = 0.4;
+    private static final double MULTI_CLICK_DISTANCE = 4;
 
     private final long handle;
     private final long vg;
     private final long handCursor;
+    private final long ibeamCursor;
     private final ByteBuffer regularFontData;
     private final ByteBuffer semiboldFontData;
     private final Canvas canvas;
@@ -50,6 +55,13 @@ final class Window {
     private Screen screen;
     private Widget hovered;
     private Widget pressed;
+    private Widget focused;
+    private double nextBlink;
+
+    private int clickCount;
+    private double lastClickTime;
+    private double lastClickX;
+    private double lastClickY;
 
     /** Cursor position in window coordinates; negative when the cursor is outside. */
     private double cursorX = -1;
@@ -99,6 +111,7 @@ final class Window {
         }
         canvas = new Canvas(vg, regular, semibold, theme);
         handCursor = glfwCreateStandardCursor(GLFW_POINTING_HAND_CURSOR);
+        ibeamCursor = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
 
         installCallbacks();
     }
@@ -108,9 +121,22 @@ final class Window {
             hovered.hovered = false;
             hovered = null;
         }
+        if (pressed != null) {
+            pressed.pressed = false;
+            pressed = null;
+        }
+        focus(null, false);
         screen = next;
         Title title = next.getClass().getAnnotation(Title.class);
         glfwSetWindowTitle(handle, title != null ? title.value() : "unweird");
+
+        // Put the cursor in the first text field, so a login form can be typed into right away.
+        for (Widget widget : next.focusables()) {
+            if (widget instanceof Field) {
+                focus(widget, false);
+                break;
+            }
+        }
         dirty.set(true);
     }
 
@@ -131,6 +157,15 @@ final class Window {
         while (!glfwWindowShouldClose(handle)) {
             if (dirty.getAndSet(false)) {
                 render();
+            } else if (focused != null && focused.blinks()) {
+                double wait = nextBlink - glfwGetTime();
+                if (wait <= 0) {
+                    focused.caretOn = !focused.caretOn;
+                    nextBlink = glfwGetTime() + BLINK_SECONDS;
+                    dirty.set(true);
+                } else {
+                    glfwWaitEventsTimeout(wait);
+                }
             } else {
                 glfwWaitEvents();
             }
@@ -144,6 +179,7 @@ final class Window {
         MemoryUtil.memFree(regularFontData);
         MemoryUtil.memFree(semiboldFontData);
         glfwDestroyCursor(handCursor);
+        glfwDestroyCursor(ibeamCursor);
         glfwDestroyWindow(handle);
         glfwTerminate();
         GLFWErrorCallback previous = glfwSetErrorCallback(null);
@@ -188,6 +224,11 @@ final class Window {
         glfwSetCursorPosCallback(handle, (window, x, y) -> {
             cursorX = x;
             cursorY = y;
+            if (pressed != null && pressed.focusable()) {
+                pressed.mouseDrag(logical(x), logical(y));
+                resetBlink();
+                dirty.set(true);
+            }
             updateHover();
         });
         glfwSetCursorEnterCallback(handle, (window, entered) -> {
@@ -201,19 +242,47 @@ final class Window {
             if (button != GLFW_MOUSE_BUTTON_LEFT) {
                 return;
             }
-            if (action == GLFW_PRESS && hovered != null) {
+            if (action == GLFW_PRESS) {
+                countClicks();
+                if (hovered == null) {
+                    focus(null, false); // clicking empty space drops focus
+                    return;
+                }
                 pressed = hovered;
                 pressed.pressed = true;
+                if (pressed.focusable()) {
+                    focus(pressed, false);
+                    pressed.mouseDown(logical(cursorX), logical(cursorY), clickCount, (mods & GLFW_MOD_SHIFT) != 0);
+                }
                 dirty.set(true);
             } else if (action == GLFW_RELEASE && pressed != null) {
                 Widget released = pressed;
                 pressed = null;
                 released.pressed = false;
-                if (released == hovered) {
-                    click(released);
+                if (released == hovered && released.clickable()) {
+                    safely(released, released::click);
                 }
                 dirty.set(true);
             }
+        });
+        glfwSetKeyCallback(handle, (window, key, scancode, action, mods) -> {
+            if (action == GLFW_RELEASE) {
+                return;
+            }
+            resetBlink();
+            if (key == GLFW_KEY_TAB) {
+                moveFocus((mods & GLFW_MOD_SHIFT) != 0 ? -1 : 1);
+            } else if (focused != null) {
+                focused.keyPressed(key, mods, this);
+            }
+            dirty.set(true); // the key may have changed state that lambdas read
+        });
+        glfwSetCharCallback(handle, (window, codePoint) -> {
+            resetBlink();
+            if (focused != null) {
+                focused.typed(codePoint, this);
+            }
+            dirty.set(true);
         });
         glfwSetFramebufferSizeCallback(handle, (window, w, h) -> dirty.set(true));
         glfwSetWindowContentScaleCallback(handle, (window, sx, sy) -> dirty.set(true));
@@ -223,7 +292,7 @@ final class Window {
     private void updateHover() {
         Widget target = null;
         if (screen != null && cursorX >= 0 && cursorY >= 0) {
-            target = screen.hitTest((float) cursorX * windowToLogical, (float) cursorY * windowToLogical);
+            target = screen.hitTest(logical(cursorX), logical(cursorY));
         }
         if (target != hovered) {
             if (hovered != null) {
@@ -233,17 +302,97 @@ final class Window {
             if (target != null) {
                 target.hovered = true;
             }
-            glfwSetCursor(handle, target != null ? handCursor : NULL);
+            // while dragging a selection, keep the I-beam even when leaving the field
+            Widget shapeSource = pressed != null ? pressed : target;
+            glfwSetCursor(handle, shapeSource == null ? NULL : switch (shapeSource.cursorShape()) {
+                case HAND -> handCursor;
+                case IBEAM -> ibeamCursor;
+                case ARROW -> NULL;
+            });
             dirty.set(true);
         }
     }
 
-    private static void click(Widget widget) {
+    private float logical(double windowCoordinate) {
+        return (float) windowCoordinate * windowToLogical;
+    }
+
+    private void focus(Widget next, boolean viaKeyboard) {
+        if (focused == next) {
+            if (next != null) {
+                next.focusVisible = viaKeyboard;
+            }
+            return;
+        }
+        if (focused != null) {
+            focused.focused = false;
+            focused.focusVisible = false;
+        }
+        focused = next;
+        if (next != null) {
+            next.focused = true;
+            next.focusVisible = viaKeyboard;
+            resetBlink();
+        }
+        dirty.set(true);
+    }
+
+    /** Tab / Shift+Tab: next or previous focusable widget, wrapping around. */
+    private void moveFocus(int direction) {
+        if (screen == null) {
+            return;
+        }
+        List<Widget> order = screen.focusables();
+        if (order.isEmpty()) {
+            return;
+        }
+        int current = order.indexOf(focused);
+        int next = current < 0
+                ? (direction > 0 ? 0 : order.size() - 1)
+                : Math.floorMod(current + direction, order.size());
+        Widget target = order.get(next);
+        if (target instanceof Field field) {
+            field.selectAllForTab();
+        }
+        focus(target, true);
+    }
+
+    private void resetBlink() {
+        if (focused != null) {
+            focused.caretOn = true;
+        }
+        nextBlink = glfwGetTime() + BLINK_SECONDS;
+    }
+
+    private void countClicks() {
+        double now = glfwGetTime();
+        boolean quick = now - lastClickTime < MULTI_CLICK_SECONDS;
+        boolean near = Math.abs(cursorX - lastClickX) <= MULTI_CLICK_DISTANCE && Math.abs(cursorY - lastClickY) <= MULTI_CLICK_DISTANCE;
+        clickCount = quick && near ? clickCount + 1 : 1;
+        lastClickTime = now;
+        lastClickX = cursorX;
+        lastClickY = cursorY;
+    }
+
+    // ---- Host ----
+
+    @Override
+    public String clipboard() {
+        return glfwGetClipboardString(handle);
+    }
+
+    @Override
+    public void clipboard(String text) {
+        glfwSetClipboardString(handle, text);
+    }
+
+    @Override
+    public void safely(Widget source, Runnable handler) {
         try {
-            widget.click();
+            handler.run();
         } catch (RuntimeException e) {
             // A broken handler shouldn't take the whole app down.
-            System.err.println("unweird: a click handler on " + widget.getClass().getSimpleName() + " threw:");
+            System.err.println("unweird: a handler on " + source.getClass().getSimpleName() + " threw:");
             e.printStackTrace();
         }
     }

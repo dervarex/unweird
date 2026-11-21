@@ -111,6 +111,24 @@ public abstract class Container extends Widget {
                 return hit;
             }
         }
-        return clickable() ? this : null;
+        return interactive() ? this : null;
+    }
+
+    /** All focusable widgets inside this container, in Tab order (declaration order, depth first). */
+    final List<Widget> focusables() {
+        List<Widget> result = new ArrayList<>();
+        collectFocusables(result);
+        return result;
+    }
+
+    private void collectFocusables(List<Widget> into) {
+        for (Widget child : children()) {
+            if (child.focusable()) {
+                into.add(child);
+            }
+            if (child instanceof Container container) {
+                container.collectFocusables(into);
+            }
+        }
     }
 }

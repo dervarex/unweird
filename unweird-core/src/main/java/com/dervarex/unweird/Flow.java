@@ -8,8 +8,9 @@ import java.util.List;
  *
  * <ul>
  *   <li>The first {@link Text} becomes a heading, a text right after it a subtitle.</li>
- *   <li>Consecutive {@link Button}s share one row.</li>
+ *   <li>Consecutive {@link Button}s share one row; consecutive {@link Field}s form a tight block.</li>
  *   <li>The card is vertically centered when it fits, otherwise it starts at the top.</li>
+ *   <li>Empty texts take no space, so a status line appears only once it says something.</li>
  * </ul>
  *
  * The full inference rules and relational overrides replace this in M4 (see DESIGN.md).
@@ -25,7 +26,15 @@ final class Flow {
     }
 
     static void arrange(Screen screen, Canvas canvas) {
-        List<Widget> children = screen.children();
+        // An empty text (e.g. a status message nobody has set yet) takes no space.
+        List<Widget> children = new ArrayList<>();
+        for (Widget child : screen.children()) {
+            if (child instanceof Text text && text.text().isEmpty()) {
+                child.place(canvas, screen.getX(), screen.getY(), 0, 0);
+            } else {
+                children.add(child);
+            }
+        }
         screen.card = !children.isEmpty();
         if (!screen.card) {
             return;
@@ -126,8 +135,14 @@ final class Flow {
         if (a instanceof Text ta && b instanceof Text tb) {
             return ta.resolved == Text.Role.HEADING && tb.resolved == Text.Role.SUBTITLE ? 6 : 12;
         }
-        if (a instanceof Text && b instanceof Button) {
-            return 28;
+        if (a instanceof Field && b instanceof Field) {
+            return 10; // a block of inputs
+        }
+        if (a instanceof Text && (b instanceof Field || b instanceof Button)) {
+            return 28; // from the heading block to the form
+        }
+        if (a instanceof Field && b instanceof Button) {
+            return 20;
         }
         return 16;
     }
