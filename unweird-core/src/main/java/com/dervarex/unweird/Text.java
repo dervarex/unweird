@@ -36,6 +36,11 @@ public class Text extends Widget {
         this.text = "";
     }
 
+    @Override
+    boolean isShown() {
+        return super.isShown() && !text.isEmpty(); // an empty text takes no space
+    }
+
     /** The text currently shown. */
     public String text() {
         return text;
@@ -85,6 +90,8 @@ public class Text extends Widget {
     @Override public Text alignLeft(Widget other) { super.alignLeft(other); return this; }
     @Override public Text alignRight(Widget other) { super.alignRight(other); return this; }
     @Override public Text gap(float pixels) { super.gap(pixels); return this; }
+    @Override public Text visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
+    @Override public Text enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
 
     @Override
     protected void update() {

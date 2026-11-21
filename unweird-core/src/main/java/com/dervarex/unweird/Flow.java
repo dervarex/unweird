@@ -111,7 +111,7 @@ final class Flow {
         Mode mode = container.flowMode;
         List<Widget> visible = new ArrayList<>();
         for (Widget child : container.children()) {
-            if (child instanceof Text text && text.text().isEmpty()) {
+            if (!child.isShown()) {
                 if (place) {
                     child.place(canvas, x, y, 0, 0);
                 }

@@ -53,6 +53,7 @@ public abstract class Screen extends Container {
     protected void update() {
         super.update();
         for (DockSlot slot : docks) {
+            slot.component.evaluateConditions();
             slot.component.update();
         }
     }

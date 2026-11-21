@@ -258,6 +258,17 @@ public final class Canvas {
         nvgFill(vg);
     }
 
+    /** Draws whatever {@code body} draws at reduced opacity (disabled widgets). */
+    public void dimmed(Runnable body) {
+        nvgSave(vg);
+        nvgGlobalAlpha(vg, 0.45f);
+        try {
+            body.run();
+        } finally {
+            nvgRestore(vg);
+        }
+    }
+
     /** Restricts drawing to the given rectangle until {@link #unclip()}. Calls must be balanced. */
     public void clip(float x, float y, float width, float height) {
         nvgSave(vg);

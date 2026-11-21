@@ -80,6 +80,7 @@ public abstract class Container extends Widget {
     @Override
     protected void update() {
         for (Widget child : children()) {
+            child.evaluateConditions();
             child.update();
         }
     }
@@ -105,7 +106,14 @@ public abstract class Container extends Widget {
     @Override
     protected void draw(Canvas canvas) {
         for (Widget child : children()) {
-            child.draw(canvas);
+            if (!child.isShown()) {
+                continue;
+            }
+            if (child.isEnabled()) {
+                child.draw(canvas);
+            } else {
+                canvas.dimmed(() -> child.draw(canvas));
+            }
         }
     }
 
@@ -133,6 +141,9 @@ public abstract class Container extends Widget {
 
     private void collectFocusables(List<Widget> into) {
         for (Widget child : children()) {
+            if (!child.isShown() || !child.isEnabled()) {
+                continue;
+            }
             if (child.focusable()) {
                 into.add(child);
             }

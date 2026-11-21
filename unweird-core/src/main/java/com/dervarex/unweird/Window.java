@@ -243,6 +243,9 @@ final class Window implements Host {
         nvgEndFrame(vg);
         glfwSwapBuffers(handle);
 
+        if (focused != null && !focused.interactive()) {
+            focus(null, false); // it was disabled or hidden by the last change
+        }
         updateHover(); // the layout may have moved something under the cursor
     }
 

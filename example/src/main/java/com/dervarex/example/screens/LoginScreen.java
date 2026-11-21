@@ -2,52 +2,32 @@ package com.dervarex.example.screens;
 
 import com.dervarex.example.components.Header;
 import com.dervarex.example.components.Sidebar;
-import com.dervarex.unweird.Button;
-import com.dervarex.unweird.Checkbox;
-import com.dervarex.unweird.Field;
 import com.dervarex.unweird.Image;
 import com.dervarex.unweird.Screen;
-import com.dervarex.unweird.Text;
-import com.dervarex.unweird.annotation.State;
 import com.dervarex.unweird.annotation.Title;
 import com.dervarex.unweird.annotation.Without;
+import com.dervarex.unweird.components.LoginForm;
 
 @Title("Sign in")
 @Without({Sidebar.class, Header.class})
 public class LoginScreen extends Screen {
 
-    @State String message = "";
-
-    Image logo    = new Image("/images/logo.png").size(56, 56);
-    Text heading  = new Text("Welcome back");
-    Text greeting = new Text(this::greeting);            // live: updates while you type
-    Field user    = new Field("Username");
-    Field pass    = new Field("Password").masked().onSubmit(this::signIn);
-
-    // one row: the checkbox lined up with the fields' left edge, the link with their right edge
-    Button forgot = new Button("Forgot password?").ghost().alignRight(pass).gap(4)
-            .onClick(() -> message = "Try \"hunter2\".");
-    Checkbox remember = new Checkbox("Remember me").leftOf(forgot).alignLeft(pass);
-
-    Button signIn = new Button("Sign in").onClick(this::signIn);
-    Text status   = new Text(() -> message);
+    Image logo     = new Image("/images/logo.png").size(56, 56);
+    LoginForm form = new LoginForm()
+            .onSignIn(this::signIn)
+            .onForgotPassword(() -> form().fail("Try \"hunter2\"."));
 
     @Override
     protected void onShow() {
-        pass.value("");   // never keep a password around after logging out
-        message = "";
+        form.reset();   // never keep a password around after logging out
     }
 
-    private String greeting() {
-        return user.value().isBlank() ? "Sign in to continue" : "Hi " + user.value() + "!";
+    private LoginForm form() {
+        return form;
     }
 
-    private void signIn() {
-        if (user.value().isBlank() || pass.value().isEmpty()) {
-            message = "Please enter a username and password.";
-            return;
-        }
-        shared(Header.class).setUser(user.value().strip());
+    private void signIn(LoginForm.Credentials credentials) {
+        shared(Header.class).setUser(credentials.username());
         go(HomeScreen.class);
     }
 }

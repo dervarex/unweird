@@ -3,6 +3,9 @@ package com.dervarex.unweird;
 import lombok.AccessLevel;
 import lombok.Getter;
 
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
 /**
  * Anything that can be shown: {@link Text}, {@link Button}, {@link Field}, and containers such as
  * {@link Screen} and {@link Component}.
@@ -30,6 +33,45 @@ public abstract class Widget {
     boolean caretOn = true;
 
     Container parent;
+
+    // ---- visibility and enabled state, re-evaluated after every event ----
+
+    private BooleanSupplier visibleIf;
+    private BooleanSupplier enabledIf;
+    private boolean visible = true;
+    private boolean enabled = true;
+
+    /** Shows this widget only while {@code condition} is true; hidden widgets take no space. */
+    public Widget visibleIf(BooleanSupplier condition) {
+        visibleIf = Objects.requireNonNull(condition, "condition");
+        return this;
+    }
+
+    /** Lets the user interact with this widget only while {@code condition} is true; otherwise it's dimmed. */
+    public Widget enabledIf(BooleanSupplier condition) {
+        enabledIf = Objects.requireNonNull(condition, "condition");
+        return this;
+    }
+
+    /** Re-evaluates {@link #visibleIf} and {@link #enabledIf}. Called by the parent before {@link #update()}. */
+    final void evaluateConditions() {
+        if (visibleIf != null) {
+            visible = visibleIf.getAsBoolean();
+        }
+        if (enabledIf != null) {
+            enabled = enabledIf.getAsBoolean();
+        }
+    }
+
+    /** Whether the layout should give this widget space. */
+    boolean isShown() {
+        return visible;
+    }
+
+    /** Whether this widget currently reacts to input. */
+    final boolean isEnabled() {
+        return enabled;
+    }
 
     // ---- relational overrides (see DESIGN.md, "Layout") ----
 
@@ -171,7 +213,7 @@ public abstract class Widget {
     }
 
     final boolean interactive() {
-        return clickable() || focusable();
+        return enabled && visible && (clickable() || focusable());
     }
 
     final void place(Canvas canvas, float x, float y, float width, float height) {

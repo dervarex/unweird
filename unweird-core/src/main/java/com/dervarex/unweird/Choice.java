@@ -56,6 +56,8 @@ abstract class Choice<T extends Choice<T>> extends Widget {
     @Override public T alignLeft(Widget other) { super.alignLeft(other); return self(); }
     @Override public T alignRight(Widget other) { super.alignRight(other); return self(); }
     @Override public T gap(float pixels) { super.gap(pixels); return self(); }
+    @Override public T visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return self(); }
+    @Override public T enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return self(); }
 
     @Override
     protected boolean clickable() {

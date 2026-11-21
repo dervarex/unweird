@@ -98,6 +98,8 @@ public class Button extends Widget {
     @Override public Button alignLeft(Widget other) { super.alignLeft(other); return this; }
     @Override public Button alignRight(Widget other) { super.alignRight(other); return this; }
     @Override public Button gap(float pixels) { super.gap(pixels); return this; }
+    @Override public Button visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
+    @Override public Button enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
 
     @Override
     protected void update() {

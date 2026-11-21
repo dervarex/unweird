@@ -92,6 +92,8 @@ public class Field extends Widget {
     @Override public Field alignLeft(Widget other) { super.alignLeft(other); return this; }
     @Override public Field alignRight(Widget other) { super.alignRight(other); return this; }
     @Override public Field gap(float pixels) { super.gap(pixels); return this; }
+    @Override public Field visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
+    @Override public Field enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
 
     // ---- selection helpers (package-private for tests) ----
 

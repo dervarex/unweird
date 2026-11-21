@@ -81,6 +81,8 @@ public class Image extends Widget {
     @Override public Image alignLeft(Widget other) { super.alignLeft(other); return this; }
     @Override public Image alignRight(Widget other) { super.alignRight(other); return this; }
     @Override public Image gap(float pixels) { super.gap(pixels); return this; }
+    @Override public Image visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
+    @Override public Image enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
 
     @Override
     protected Size measure(Canvas canvas, float maxWidth) {

@@ -84,6 +84,8 @@ public class ListView<T> extends Widget {
     @Override public ListView<T> alignLeft(Widget other) { super.alignLeft(other); return this; }
     @Override public ListView<T> alignRight(Widget other) { super.alignRight(other); return this; }
     @Override public ListView<T> gap(float pixels) { super.gap(pixels); return this; }
+    @Override public ListView<T> visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
+    @Override public ListView<T> enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
 
     String labelOf(T item) {
         return String.valueOf(labels.apply(item));

@@ -93,7 +93,7 @@ final class Docking {
     // ---- inside a docked component ----
 
     static Size measure(Container dock, Canvas canvas, float maxWidth) {
-        List<Widget> children = dock.children();
+        List<Widget> children = dock.children().stream().filter(Widget::isShown).toList();
         inferRoles(children, dock.dockAxis);
         if (dock.dockAxis == Axis.VERTICAL) {
             float width = 0;
@@ -117,7 +117,12 @@ final class Docking {
     }
 
     static void arrange(Container dock, Canvas canvas) {
-        List<Widget> children = dock.children();
+        for (Widget child : dock.children()) {
+            if (!child.isShown()) {
+                child.place(canvas, dock.getX(), dock.getY(), 0, 0);
+            }
+        }
+        List<Widget> children = dock.children().stream().filter(Widget::isShown).toList();
         inferRoles(children, dock.dockAxis);
         if (dock.dockAxis == Axis.VERTICAL) {
             float y = dock.getY();

@@ -84,6 +84,8 @@ public class Dropdown<T> extends Widget {
     @Override public Dropdown<T> alignLeft(Widget other) { super.alignLeft(other); return this; }
     @Override public Dropdown<T> alignRight(Widget other) { super.alignRight(other); return this; }
     @Override public Dropdown<T> gap(float pixels) { super.gap(pixels); return this; }
+    @Override public Dropdown<T> visibleIf(java.util.function.BooleanSupplier condition) { super.visibleIf(condition); return this; }
+    @Override public Dropdown<T> enabledIf(java.util.function.BooleanSupplier condition) { super.enabledIf(condition); return this; }
 
     String labelOf(T option) {
         return String.valueOf(labels.apply(option));

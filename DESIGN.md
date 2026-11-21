@@ -88,6 +88,15 @@ public class Example {
 | `Image` | `new Image("/images/logo.png").size(56, 56)` | Classpath or `Image.file(path)`; placeholder if missing |
 | `Component` | `class Sidebar extends Component { ... }` | Your own groups of widgets |
 
+Every widget can be shown or enabled conditionally, re-evaluated after every event:
+`.visibleIf(() -> ...)` (hidden widgets take no space) and `.enabledIf(() -> ...)` (dimmed, no input, skipped by Tab).
+
+### Ready-made components (`unweird-components`)
+
+| Component | Example |
+|---|---|
+| `LoginForm` | `new LoginForm().onSignIn(c -> ...).onForgotPassword(...)`; `fail("Wrong password")`, `reset()` |
+
 All widgets support the relational overrides (`below`, `rightOf`, `alignRight`, `gap`, ...) and return their own type,
 so they chain at the declaration.
 
