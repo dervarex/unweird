@@ -398,6 +398,9 @@ final class Window implements Host {
                     glfwWaitEventsTimeout(MIN_FRAME_SECONDS - sinceLast); // still handle input while animating
                     continue;
                 }
+                // Handle input before every frame. With vsync each frame takes ~16 ms, so an animating screen would
+                // otherwise render back to back and never get to the input (clicks and drags did nothing).
+                glfwPollEvents();
                 frameRequested = false;
                 lastFrameTime = glfwGetTime();
                 render();
