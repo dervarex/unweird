@@ -81,10 +81,15 @@ public class Example {
   - Superclass fields come first.
   - `@Skip` excludes a field.
   - Calling `add(...)` yourself switches auto-adding off for that class, and only what you pass is shown, in that order.
-- Metadata goes in annotations: `@Title("...")`, `@Without(...)`, `@Fresh`.
+- Metadata goes in annotations: `@Title("...")`, `@Without(...)`, `@Fresh`. All three are inherited by subclasses.
 - Navigation: `go(HomeScreen.class)` is available in both `Screen` and `Component`. You never need an app reference.
+  From other code, `Unweird.go(...)` does the same. Calls from other threads are handed to the UI thread.
 - **Lifecycle:** each screen class is created once and cached, so typed input survives navigating away and back.
   A screen annotated `@Fresh` is rebuilt on every `go(...)`.
+- Hooks: `onShow()` runs on every visit (also the first), `onHide()` when another screen replaces it.
+  Example: the login screen clears its password field in `onShow()`.
+- **Sharing data between screens:** keep it on a `@Default` component and reach it with `shared(...)`,
+  e.g. `shared(Header.class).setUser(name)` on login, and the header shows it.
 
 ### Field order: why an annotation processor
 
@@ -104,6 +109,18 @@ If the index is missing, startup fails with a message that names the
 - Defaults are **single shared instances**. Access one from anywhere with `shared(Sidebar.class)`, so you never pass it around.
 - When several defaults dock on the same side, they stack in alphabetical order of class name for now.
   An explicit `order` attribute can come later.
+- `@Default` on something that isn't a non-abstract `Component` is a **compile error**.
+  `@Without(X.class)` where `X` isn't a default fails when the screen is shown.
+
+### How docks are laid out
+
+- Left/right docks take the full window height (200–300px wide); top/bottom docks span the width that's left.
+  Each dock is drawn as a surface-colored panel with a hairline towards the content.
+- **Side docks** stack vertically: the first `Text` becomes a title, buttons become plain full-width
+  navigation items (label on the left, highlight on hover).
+- **Top/bottom docks** are a row: texts on the left (the first one a title), buttons on the right.
+- Tab order: top docks, left docks, the screen's content, right docks, bottom docks.
+- The screen's content is laid out in the area left over, exactly as without docks.
 
 ## State & reactivity
 
@@ -188,7 +205,7 @@ Explicit styling like `new Text("x").heading()` also overrides inference.
 | **M0** ✅ | Multi-module Gradle build, annotations, this document |
 | **M1** ✅ | Window + NanoVG + bundled font (Noto Sans); `Text` and `Button` drawn; annotation processor + auto-added fields; simple flow layout (centered card, heading/subtitle inference, button rows); lambdas re-evaluated on every redraw; hover/press/click |
 | **M2** ✅ | `Field`: typing, cursor, selection, clipboard, masking, scrolling, blinking caret; focus & Tab; keyboard-activated buttons; empty texts collapse |
-| **M3** | `go(...)`, screen caching, `@Fresh`, `@Title`; `@Default` docking, `@Without`, `shared(...)` |
+| **M3** ✅ | `go(...)`, screen caching, `@Fresh`, `onShow`/`onHide`; `@Default` docking, `@Without`, `shared(...)`; compile-time `@Default` checks |
 | **M4** | Full inference rules + relational overrides; `Theme` light/dark/custom, `style(...)` |
 | **M5** | More widgets: checkbox, toggle, dropdown, list, image, scroll container; first `unweird-components` |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |

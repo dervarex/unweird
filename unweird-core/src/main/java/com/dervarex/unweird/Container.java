@@ -20,6 +20,8 @@ public abstract class Container extends Widget {
 
     private List<Widget> manual;
     private List<Widget> children;
+    /** Set while this container is docked on a screen edge; switches to {@link Docking}'s layout. */
+    Docking.Axis dockAxis;
 
     /** Shows exactly these widgets, in this order, instead of the declared fields. Can be called repeatedly. */
     protected final void add(Widget... widgets) {
@@ -35,6 +37,19 @@ public abstract class Container extends Widget {
     /** Redraws soon. Only needed after changing state from a thread other than the UI thread. */
     protected final void refresh() {
         Unweird.refresh();
+    }
+
+    /**
+     * Shows another screen: {@code go(HomeScreen.class)}. Screens are created once and reused,
+     * unless marked {@link com.dervarex.unweird.annotation.Fresh @Fresh}.
+     */
+    protected final void go(Class<? extends Screen> screen) {
+        Unweird.go(screen);
+    }
+
+    /** The shared instance of a {@link com.dervarex.unweird.annotation.Default @Default} component, e.g. {@code shared(Sidebar.class)}. */
+    protected final <T extends Component> T shared(Class<T> type) {
+        return Unweird.shared(type);
     }
 
     final List<Widget> children() {
@@ -70,6 +85,9 @@ public abstract class Container extends Widget {
     /** Default layout: children stacked top to bottom at full width. */
     @Override
     protected Size measure(Canvas canvas, float maxWidth) {
+        if (dockAxis != null) {
+            return Docking.measure(this, canvas, maxWidth);
+        }
         float width = 0;
         float height = 0;
         List<Widget> kids = children();
@@ -84,6 +102,10 @@ public abstract class Container extends Widget {
 
     @Override
     protected void arrange(Canvas canvas) {
+        if (dockAxis != null) {
+            Docking.arrange(this, canvas);
+            return;
+        }
         float cy = getY();
         for (Widget child : children()) {
             float h = child.measure(canvas, getWidth()).height();

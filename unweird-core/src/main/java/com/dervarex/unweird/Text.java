@@ -12,7 +12,7 @@ import java.util.function.Supplier;
  */
 public class Text extends Widget {
 
-    enum Role { AUTO, HEADING, SUBTITLE, BODY }
+    enum Role { AUTO, HEADING, TITLE, SUBTITLE, BODY }
 
     private volatile Supplier<String> source;
     private volatile String text;
@@ -76,10 +76,14 @@ public class Text extends Widget {
     }
 
     private Canvas.Weight weight() {
-        return resolved == Role.HEADING ? Canvas.Weight.SEMIBOLD : Canvas.Weight.REGULAR;
+        return resolved == Role.HEADING || resolved == Role.TITLE ? Canvas.Weight.SEMIBOLD : Canvas.Weight.REGULAR;
     }
 
     private float fontSize() {
-        return resolved == Role.HEADING ? 26 : 15;
+        return switch (resolved) {
+            case HEADING -> 26;
+            case TITLE -> 17;
+            default -> 15;
+        };
     }
 }

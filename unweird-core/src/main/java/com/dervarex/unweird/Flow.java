@@ -25,12 +25,17 @@ final class Flow {
     private Flow() {
     }
 
-    static void arrange(Screen screen, Canvas canvas) {
+    /** Lays out the screen's content inside {@code area} = {x, y, width, height}. */
+    static void arrange(Screen screen, Canvas canvas, float[] area) {
+        float areaX = area[0];
+        float areaY = area[1];
+        float areaWidth = area[2];
+        float areaHeight = area[3];
         // An empty text (e.g. a status message nobody has set yet) takes no space.
         List<Widget> children = new ArrayList<>();
         for (Widget child : screen.children()) {
             if (child instanceof Text text && text.text().isEmpty()) {
-                child.place(canvas, screen.getX(), screen.getY(), 0, 0);
+                child.place(canvas, areaX, areaY, 0, 0);
             } else {
                 children.add(child);
             }
@@ -43,7 +48,7 @@ final class Flow {
         inferTextRoles(children);
         List<List<Widget>> rows = rows(children);
 
-        float cardWidth = Math.min(CARD_CONTENT_WIDTH + CARD_PADDING * 2, screen.getWidth() - OUTER_MARGIN * 2);
+        float cardWidth = Math.min(CARD_CONTENT_WIDTH + CARD_PADDING * 2, areaWidth - OUTER_MARGIN * 2);
         float contentWidth = Math.max(0, cardWidth - CARD_PADDING * 2);
 
         float[] heights = new float[rows.size()];
@@ -57,11 +62,11 @@ final class Flow {
         }
 
         float cardHeight = total + CARD_PADDING * 2;
-        float freeHeight = screen.getHeight() - OUTER_MARGIN * 2;
+        float freeHeight = areaHeight - OUTER_MARGIN * 2;
         screen.cardWidth = cardWidth;
         screen.cardHeight = cardHeight;
-        screen.cardX = screen.getX() + (screen.getWidth() - cardWidth) / 2;
-        screen.cardY = screen.getY() + (cardHeight <= freeHeight ? (screen.getHeight() - cardHeight) / 2 : OUTER_MARGIN);
+        screen.cardX = areaX + (areaWidth - cardWidth) / 2;
+        screen.cardY = areaY + (cardHeight <= freeHeight ? (areaHeight - cardHeight) / 2 : OUTER_MARGIN);
 
         float x = screen.cardX + CARD_PADDING;
         float y = screen.cardY + CARD_PADDING;

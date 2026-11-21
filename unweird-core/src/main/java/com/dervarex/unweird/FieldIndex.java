@@ -1,15 +1,8 @@
 package com.dervarex.unweird;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,30 +86,15 @@ final class FieldIndex {
     }
 
     private static Map<String, List<String>> load() {
-        ClassLoader loader = Thread.currentThread().getContextClassLoader();
-        if (loader == null) {
-            loader = FieldIndex.class.getClassLoader();
-        }
         Map<String, List<String>> result = new HashMap<>();
-        try {
-            Enumeration<URL> files = loader.getResources(INDEX);
-            while (files.hasMoreElements()) {
-                URL file = files.nextElement();
-                try (var reader = new BufferedReader(new InputStreamReader(file.openStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        int eq = line.indexOf('=');
-                        if (eq <= 0) {
-                            continue;
-                        }
-                        String fields = line.substring(eq + 1).strip();
-                        result.put(line.substring(0, eq).strip(),
-                                fields.isEmpty() ? List.of() : List.copyOf(Arrays.asList(fields.split(","))));
-                    }
-                }
+        for (String line : IndexFiles.lines(INDEX)) {
+            int eq = line.indexOf('=');
+            if (eq <= 0) {
+                continue;
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException("unweird: could not read " + INDEX, e);
+            String fields = line.substring(eq + 1).strip();
+            result.put(line.substring(0, eq).strip(),
+                    fields.isEmpty() ? List.of() : List.copyOf(Arrays.asList(fields.split(","))));
         }
         return Map.copyOf(result);
     }

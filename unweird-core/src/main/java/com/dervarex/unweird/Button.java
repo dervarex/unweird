@@ -13,9 +13,18 @@ import static org.lwjgl.glfw.GLFW.GLFW_KEY_SPACE;
 /** A clickable button. {@code new Button("Sign in").onClick(() -> ...)} */
 public class Button extends Widget {
 
+    /** How the button looks; decided by the layout (filled in content, plain in sidebars and headers). */
+    enum Variant { PRIMARY, GHOST }
+
     private static final float HEIGHT = 40;
+    private static final float GHOST_HEIGHT = 36;
     private static final float PADDING_X = 18;
+    private static final float GHOST_PADDING_X = 12;
     private static final float FONT_SIZE = 15;
+
+    Variant variant = Variant.PRIMARY;
+    /** Label at the start instead of centered (navigation items). */
+    boolean alignStart;
 
     private final List<Runnable> handlers = new CopyOnWriteArrayList<>();
     private volatile String label;
@@ -67,13 +76,19 @@ public class Button extends Widget {
 
     @Override
     protected Size measure(Canvas canvas, float maxWidth) {
-        float width = canvas.textWidth(label, Canvas.Weight.SEMIBOLD, FONT_SIZE) + PADDING_X * 2;
-        return new Size(Math.min(width, maxWidth), HEIGHT);
+        boolean ghost = variant == Variant.GHOST;
+        float padding = ghost ? GHOST_PADDING_X : PADDING_X;
+        float width = canvas.textWidth(label, Canvas.Weight.SEMIBOLD, FONT_SIZE) + padding * 2;
+        return new Size(Math.min(width, maxWidth), ghost ? GHOST_HEIGHT : HEIGHT);
     }
 
     @Override
     protected void draw(Canvas canvas) {
         var theme = canvas.getTheme();
+        if (variant == Variant.GHOST) {
+            drawGhost(canvas);
+            return;
+        }
         var fill = theme.getAccent();
         if (isPressed()) {
             fill = fill.mix(Color.BLACK, 0.15f);
@@ -87,5 +102,22 @@ public class Button extends Widget {
         }
         canvas.fillRect(getX(), getY(), getWidth(), getHeight(), theme.getRadius(), fill);
         canvas.label(label, getX() + getWidth() / 2, getY() + getHeight() / 2, Canvas.Weight.SEMIBOLD, FONT_SIZE, theme.getOnAccent());
+    }
+
+    private void drawGhost(Canvas canvas) {
+        var theme = canvas.getTheme();
+        float alpha = isPressed() ? 0.10f : isHovered() ? 0.06f : 0;
+        if (alpha > 0) {
+            canvas.fillRect(getX(), getY(), getWidth(), getHeight(), theme.getRadius(), theme.getText().withAlpha(alpha));
+        }
+        if (isFocused() && isFocusVisible()) {
+            canvas.strokeRect(getX(), getY(), getWidth(), getHeight(), theme.getRadius(), 2, theme.getAccent().withAlpha(0.6f));
+        }
+        float centerY = getY() + getHeight() / 2;
+        if (alignStart) {
+            canvas.textLine(label, getX() + GHOST_PADDING_X, centerY, Canvas.Weight.SEMIBOLD, FONT_SIZE, theme.getText());
+        } else {
+            canvas.label(label, getX() + getWidth() / 2, centerY, Canvas.Weight.SEMIBOLD, FONT_SIZE, theme.getText());
+        }
     }
 }

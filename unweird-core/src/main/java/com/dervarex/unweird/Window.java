@@ -13,6 +13,8 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -50,6 +52,8 @@ final class Window implements Host {
     private final ByteBuffer semiboldFontData;
     private final Canvas canvas;
     private final AtomicBoolean dirty = new AtomicBoolean(true);
+    private final Queue<Runnable> uiTasks = new ConcurrentLinkedQueue<>();
+    private final Thread uiThread = Thread.currentThread();
 
     private Theme theme;
     private Screen screen;
@@ -151,10 +155,23 @@ final class Window implements Host {
         glfwPostEmptyEvent();
     }
 
+    /** Runs {@code task} on the UI thread: right away if we're on it, otherwise as soon as the loop wakes up. */
+    void runOnUiThread(Runnable task) {
+        if (Thread.currentThread() == uiThread) {
+            task.run();
+        } else {
+            uiTasks.add(task);
+            requestRender();
+        }
+    }
+
     /** Runs until the window is closed. Blocks the calling (UI) thread. */
     void run() {
         glfwShowWindow(handle);
         while (!glfwWindowShouldClose(handle)) {
+            for (Runnable task; (task = uiTasks.poll()) != null; ) {
+                safely(null, task);
+            }
             if (dirty.getAndSet(false)) {
                 render();
             } else if (focused != null && focused.blinks()) {
@@ -342,7 +359,7 @@ final class Window implements Host {
         if (screen == null) {
             return;
         }
-        List<Widget> order = screen.focusables();
+        List<Widget> order = screen.tabOrder();
         if (order.isEmpty()) {
             return;
         }
@@ -392,7 +409,8 @@ final class Window implements Host {
             handler.run();
         } catch (RuntimeException e) {
             // A broken handler shouldn't take the whole app down.
-            System.err.println("unweird: a handler on " + source.getClass().getSimpleName() + " threw:");
+            System.err.println(source == null ? "unweird: a task on the UI thread threw:"
+                    : "unweird: a handler on " + source.getClass().getSimpleName() + " threw:");
             e.printStackTrace();
         }
     }

@@ -6,13 +6,13 @@ import com.dervarex.unweird.Text;
 import com.dervarex.unweird.annotation.State;
 import com.dervarex.unweird.annotation.Title;
 
-@Title("unweird — M1")
+@Title("Home")
 public class HomeScreen extends Screen {
 
     @State int clicks = 0;
 
     Text heading  = new Text("Welcome home!");
-    Text subtitle = new Text("This is milestone 1: text, buttons and a layout you didn't write.");
+    Text subtitle = new Text("This screen is cached: the counter survives a trip to Settings.");
     Text counter  = new Text(() -> switch (clicks) {
         case 0 -> "Nothing clicked yet.";
         case 1 -> "Clicked once.";

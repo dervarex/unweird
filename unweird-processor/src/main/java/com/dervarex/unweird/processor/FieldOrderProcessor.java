@@ -24,23 +24,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
- * Records, for every subclass of {@code com.dervarex.unweird.Container}, the widget fields in source order.
- * Java reflection does not guarantee field order, so the runtime reads this index instead.
- *
- * <p>Output: {@value #INDEX}, one line per class: {@code binary.ClassName=field1,field2}.
+ * Writes two indexes the runtime reads instead of scanning or reflecting:
+ * <ul>
+ *   <li>{@value #INDEX}: for every subclass of {@code com.dervarex.unweird.Container}, its widget fields
+ *       in source order (reflection doesn't guarantee field order). One line per class:
+ *       {@code binary.ClassName=field1,field2}.</li>
+ *   <li>{@value #DEFAULTS}: every class annotated {@code @Default}, one binary class name per line.</li>
+ * </ul>
  * Classes are matched by name, so this module does not depend on unweird-core.
  */
 @SupportedAnnotationTypes("*")
 public final class FieldOrderProcessor extends AbstractProcessor {
 
     static final String INDEX = "META-INF/unweird/fields.idx";
+    static final String DEFAULTS = "META-INF/unweird/defaults.idx";
     private static final String CONTAINER = "com.dervarex.unweird.Container";
+    private static final String COMPONENT = "com.dervarex.unweird.Component";
+    private static final String DEFAULT = "com.dervarex.unweird.annotation.Default";
     private static final String WIDGET = "com.dervarex.unweird.Widget";
     private static final String SKIP = "com.dervarex.unweird.annotation.Skip";
 
     private final Map<String, List<String>> entries = new TreeMap<>();
+    private final Set<String> defaults = new TreeSet<>();
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -61,8 +69,13 @@ public final class FieldOrderProcessor extends AbstractProcessor {
             }
         }
 
-        if (round.processingOver() && !entries.isEmpty()) {
-            write();
+        if (round.processingOver()) {
+            if (!entries.isEmpty()) {
+                write(INDEX, entries.entrySet().stream().map(e -> e.getKey() + "=" + String.join(",", e.getValue())).toList());
+            }
+            if (!defaults.isEmpty()) {
+                write(DEFAULTS, List.copyOf(defaults));
+            }
         }
         return false; // never claim annotations; other processors (Lombok) still see them
     }
@@ -73,6 +86,9 @@ public final class FieldOrderProcessor extends AbstractProcessor {
         }
         if (type.getKind() == ElementKind.CLASS && types.isSubtype(types.erasure(type.asType()), containerType)) {
             record(type, types, widgetType);
+        }
+        if (hasAnnotation(type, DEFAULT)) {
+            recordDefault(type, types);
         }
         for (TypeElement nested : ElementFilter.typesIn(type.getEnclosedElements())) {
             scan(nested, types, containerType, widgetType);
@@ -94,25 +110,45 @@ public final class FieldOrderProcessor extends AbstractProcessor {
         entries.put(binaryName, fields);
     }
 
+    private void recordDefault(TypeElement type, Types types) {
+        TypeElement component = processingEnv.getElementUtils().getTypeElement(COMPONENT);
+        boolean isComponent = component != null && types.isSubtype(types.erasure(type.asType()), types.erasure(component.asType()));
+        if (type.getKind() != ElementKind.CLASS || !isComponent) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "@Default only works on classes that extend Component", type);
+            return;
+        }
+        if (type.getModifiers().contains(Modifier.ABSTRACT)) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "@Default components can't be abstract; one shared instance is created from it", type);
+            return;
+        }
+        defaults.add(processingEnv.getElementUtils().getBinaryName(type).toString());
+    }
+
     private static boolean hasSkip(VariableElement field) {
-        for (AnnotationMirror mirror : field.getAnnotationMirrors()) {
-            if (((TypeElement) mirror.getAnnotationType().asElement()).getQualifiedName().contentEquals(SKIP)) {
+        return hasAnnotation(field, SKIP);
+    }
+
+    private static boolean hasAnnotation(Element element, String annotation) {
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            if (((TypeElement) mirror.getAnnotationType().asElement()).getQualifiedName().contentEquals(annotation)) {
                 return true;
             }
         }
         return false;
     }
 
-    private void write() {
+    private void write(String resource, List<String> lines) {
         try {
-            FileObject file = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", INDEX);
+            FileObject file = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", resource);
             try (Writer out = new java.io.OutputStreamWriter(file.openOutputStream(), StandardCharsets.UTF_8)) {
-                for (Map.Entry<String, List<String>> entry : entries.entrySet()) {
-                    out.write(entry.getKey() + "=" + String.join(",", entry.getValue()) + "\n");
+                for (String line : lines) {
+                    out.write(line + "\n");
                 }
             }
         } catch (IOException e) {
-            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "unweird: could not write " + INDEX + ": " + e);
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "unweird: could not write " + resource + ": " + e);
         }
     }
 }

@@ -7,6 +7,6 @@ interface Host {
 
     void clipboard(String text);
 
-    /** Runs user code (a handler); an exception is reported instead of crashing the app. */
+    /** Runs user code (a handler); an exception is reported instead of crashing the app. {@code source} may be null. */
     void safely(Widget source, Runnable handler);
 }
