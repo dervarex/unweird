@@ -85,8 +85,9 @@ public class Example {
 | `Toggle` | `new Toggle("Dark mode").checked(true)` | Label left, switch right |
 | `Dropdown<T>` | `new Dropdown<>("Language", List.of(...)).labels(...)` | Popup above everything; keyboard-driven too |
 | `ListView<T>` | `new ListView<>(() -> tasks).onSelect(...)` | Live items; arrows select; `empty("...")` text |
-| `Image` | `new Image("/images/logo.png").size(56, 56)` | Classpath or `Image.file(path)`; placeholder if missing |
-| `Component` | `class Sidebar extends Component { ... }` | Your own groups of widgets |
+| `Image` | `new Image("/images/logo.png").size(56, 56)` | Classpath, `Image.file(path)` or `Image.url(...)` (background download); placeholder if missing |
+| `Component` | `class Sidebar extends Component { ... }` | Your own groups of widgets; `@Card` draws one on a padded surface |
+| `Each<T>` | `new Each<>(() -> results, ResultRow::new)` | One widget per item of a live list; rows keep their state while their item stays |
 
 Every widget can be shown or enabled conditionally, re-evaluated after every event:
 `.visibleIf(() -> ...)` (hidden widgets take no space) and `.enabledIf(() -> ...)` (dimmed, no input, skipped by Tab).

@@ -267,6 +267,9 @@ final class Flow {
         if (!Float.isNaN(b.gapBefore)) {
             return b.gapBefore;
         }
+        if (a instanceof Container ca && b instanceof Container cb && ca.card && cb.card) {
+            return 12; // a list of cards
+        }
         if (a instanceof Container || b instanceof Container) {
             return 24;
         }

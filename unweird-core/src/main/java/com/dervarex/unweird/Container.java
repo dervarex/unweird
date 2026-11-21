@@ -24,6 +24,9 @@ public abstract class Container extends Widget {
     Flow.Mode flowMode = Flow.Mode.PAGE;
     /** What the first text in this container becomes, if not set explicitly. */
     Text.Role headingRole = Text.Role.TITLE;
+    /** Drawn on its own surface, see {@link com.dervarex.unweird.annotation.Card @Card}. */
+    final boolean card = getClass().isAnnotationPresent(com.dervarex.unweird.annotation.Card.class);
+    static final float CARD_PADDING = 16;
 
     /** Shows exactly these widgets, in this order, instead of the declared fields. Can be called repeatedly. */
     protected final void add(Widget... widgets) {
@@ -33,6 +36,21 @@ public abstract class Container extends Widget {
         for (Widget widget : widgets) {
             manual.add(Objects.requireNonNull(widget, "add(...) got a null widget"));
         }
+        children = null;
+    }
+
+    /** Replaces the children (used by {@link Each}). Widgets that are no longer children are released. */
+    final void replaceChildren(List<Widget> next) {
+        if (children != null) {
+            Set<Widget> keep = Collections.newSetFromMap(new IdentityHashMap<>());
+            keep.addAll(next);
+            for (Widget old : children) {
+                if (!keep.contains(old) && old.parent == this) {
+                    old.parent = null;
+                }
+            }
+        }
+        manual = new ArrayList<>(next);
         children = null;
     }
 
@@ -91,7 +109,8 @@ public abstract class Container extends Widget {
         if (dockAxis != null) {
             return Docking.measure(this, canvas, maxWidth);
         }
-        return new Size(maxWidth, Flow.column(this, canvas, maxWidth, false, 0, 0));
+        float inset = card ? CARD_PADDING * 2 : 0;
+        return new Size(maxWidth, Flow.column(this, canvas, Math.max(0, maxWidth - inset), false, 0, 0) + inset);
     }
 
     @Override
@@ -100,11 +119,17 @@ public abstract class Container extends Widget {
             Docking.arrange(this, canvas);
             return;
         }
-        Flow.column(this, canvas, getWidth(), true, getX(), getY());
+        float pad = card ? CARD_PADDING : 0;
+        Flow.column(this, canvas, Math.max(0, getWidth() - pad * 2), true, getX() + pad, getY() + pad);
     }
 
     @Override
     protected void draw(Canvas canvas) {
+        if (card && dockAxis == null) {
+            var theme = canvas.getTheme();
+            canvas.fillRect(getX(), getY(), getWidth(), getHeight(), theme.getRadius() * 1.5f, theme.getSurface());
+            canvas.strokeRect(getX(), getY(), getWidth(), getHeight(), theme.getRadius() * 1.5f, 1, theme.getBorder());
+        }
         for (Widget child : children()) {
             if (!child.isShown()) {
                 continue;
