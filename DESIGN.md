@@ -288,6 +288,7 @@ A relation to a text that's currently empty (hidden) is ignored until that text 
 | **M5** ✅ | Scrolling pages, checkbox, toggle, dropdown (overlay layer), list, image, `Each`, `@Card`, `visibleIf`/`enabledIf`; `unweird-components` with `LoginForm` |
 | **M6** ✅ | `unweird-install`: generic `Source` → `Installer` (verified downloads, dependencies, archives, honest installed state) + `ContentBrowser`; Modrinth source in the example |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
+| **3D** | `unweird-3d` (branch `3d-rendering`): a 3D viewport widget inside normal layouts, e.g. a Minecraft skin viewer or a 3D world editor; meshes, textures, camera controls |
 
 ## Open points
 
