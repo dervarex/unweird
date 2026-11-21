@@ -103,14 +103,14 @@ public class Dropdown<T> extends Widget {
     }
 
     @Override
-    boolean focusable() {
+    protected boolean focusable() {
         return true;
     }
 
     @Override
     void activate(Host host) {
         if (popup != null) {
-            host.closeOverlay();
+            host.closeOverlay(popup);
         } else {
             open(host);
         }
@@ -152,7 +152,10 @@ public class Dropdown<T> extends Widget {
     /** Picks the option at {@code index}, closes the list and tells the handlers (if the choice changed). */
     void choose(int index, Host host) {
         List<T> current = options;
-        host.closeOverlay();
+        Popup open = popup;
+        if (open != null) {
+            host.closeOverlay(open);
+        }
         if (index < 0 || index >= current.size()) {
             return;
         }
@@ -261,8 +264,8 @@ public class Dropdown<T> extends Widget {
         }
 
         @Override
-        boolean mouseMoved(float px, float py) {
-            int row = rowAt(py);
+        boolean pointerMove(Pointer pointer) {
+            int row = rowAt(pointer.y());
             if (row >= 0 && row < options.size() && row != highlighted) {
                 highlighted = row;
                 return true;
@@ -271,7 +274,7 @@ public class Dropdown<T> extends Widget {
         }
 
         @Override
-        boolean scrolled(double steps) {
+        boolean scrolled(Pointer at, double dx, double steps) {
             int max = Math.max(0, options.size() - VISIBLE_ROWS);
             int next = (int) Math.max(0, Math.min(max, first - Math.round(steps)));
             if (next == first) {

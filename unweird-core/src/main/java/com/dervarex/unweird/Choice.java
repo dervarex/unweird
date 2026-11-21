@@ -74,7 +74,7 @@ abstract class Choice<T extends Choice<T>> extends Widget {
     }
 
     @Override
-    boolean focusable() {
+    protected boolean focusable() {
         return true;
     }
 

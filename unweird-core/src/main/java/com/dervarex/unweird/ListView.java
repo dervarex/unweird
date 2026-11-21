@@ -110,13 +110,13 @@ public class ListView<T> extends Widget {
     }
 
     @Override
-    boolean focusable() {
+    protected boolean focusable() {
         return true;
     }
 
     @Override
-    CursorShape cursorShape() {
-        return items.isEmpty() ? CursorShape.ARROW : CursorShape.HAND;
+    protected Cursor cursor() {
+        return items.isEmpty() ? Cursor.ARROW : Cursor.HAND;
     }
 
     private int rowAt(float py) {
@@ -125,8 +125,8 @@ public class ListView<T> extends Widget {
     }
 
     @Override
-    boolean mouseMoved(float px, float py) {
-        int row = rowAt(py);
+    boolean pointerMove(Pointer pointer) {
+        int row = rowAt(pointer.y());
         if (row == hoverRow) {
             return false;
         }
@@ -135,8 +135,8 @@ public class ListView<T> extends Widget {
     }
 
     @Override
-    void mouseDown(float px, float py, int clicks, boolean shift) {
-        pressedRow = rowAt(py);
+    void pointerDown(Pointer pointer) {
+        pressedRow = pointer.button() == Pointer.Button.LEFT ? rowAt(pointer.y()) : -1;
     }
 
     @Override

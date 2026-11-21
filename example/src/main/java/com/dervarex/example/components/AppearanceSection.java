@@ -2,6 +2,7 @@ package com.dervarex.example.components;
 
 import com.dervarex.unweird.Component;
 import com.dervarex.unweird.Dropdown;
+import com.dervarex.unweird.Slider;
 import com.dervarex.unweird.Text;
 import com.dervarex.unweird.Toggle;
 import com.dervarex.unweird.Unweird;
@@ -39,6 +40,11 @@ public class AppearanceSection extends Component {
     Toggle dark = new Toggle("Dark mode")
             .checked(Unweird.theme().isDark())
             .onChange(on -> Unweird.theme((on ? Theme.dark() : Theme.light()).withAccent(Unweird.theme().getAccent())));
+
+    Slider corners = new Slider("Corner roundness", 0, 16)
+            .value(Unweird.theme().getRadius())
+            .format(v -> Math.round(v) + " px")
+            .onChange(v -> Unweird.theme(Unweird.theme().withRadius((float) v)));
 
     Dropdown<Accent> accent = new Dropdown<>("Accent color", List.of(Accent.values()))
             .labels(a -> a.label)

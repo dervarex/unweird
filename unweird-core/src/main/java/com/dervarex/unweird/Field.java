@@ -120,7 +120,7 @@ public class Field extends Widget {
     // ---- input ----
 
     @Override
-    boolean focusable() {
+    protected boolean focusable() {
         return true;
     }
 
@@ -130,8 +130,8 @@ public class Field extends Widget {
     }
 
     @Override
-    CursorShape cursorShape() {
-        return CursorShape.IBEAM;
+    protected Cursor cursor() {
+        return Cursor.TEXT;
     }
 
     @Override
@@ -220,8 +220,13 @@ public class Field extends Widget {
     }
 
     @Override
-    void mouseDown(float px, float py, int clicks, boolean shift) {
-        int index = indexAt(px);
+    void pointerDown(Pointer pointer) {
+        if (pointer.button() != Pointer.Button.LEFT) {
+            return;
+        }
+        int clicks = pointer.clicks();
+        boolean shift = pointer.shift();
+        int index = indexAt(pointer.x());
         if (clicks >= 3) {
             anchor = 0;
             caret = value.length();
@@ -234,8 +239,10 @@ public class Field extends Widget {
     }
 
     @Override
-    void mouseDrag(float px, float py) {
-        moveTo(indexAt(px), true);
+    void pointerDrag(Pointer pointer) {
+        if (pointer.button() == Pointer.Button.LEFT) {
+            moveTo(indexAt(pointer.x()), true);
+        }
     }
 
     /** Tabbing into a field selects its content, so typing replaces it. */

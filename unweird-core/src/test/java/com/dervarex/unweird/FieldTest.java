@@ -47,11 +47,16 @@ class FieldTest {
         }
 
         @Override
-        public void closeOverlay() {
-            Overlay closing = overlay;
-            overlay = null;
-            if (closing != null) {
+        public void closeOverlay(Overlay closing) {
+            if (overlay == closing) {
+                overlay = null;
                 closing.closed();
+            }
+        }
+
+        void closeOverlay() {
+            if (overlay != null) {
+                closeOverlay(overlay);
             }
         }
     }
@@ -204,9 +209,9 @@ class FieldTest {
         // positions are unknown before the first draw, so the caret stays put; place it explicitly
         key(field, GLFW_KEY_HOME);
         key(field, GLFW_KEY_RIGHT);
-        field.mouseDown(0, 0, 2, false);
+        field.pointerDown(new Pointer(0, 0, Pointer.Button.LEFT, 2, false, false, false, 0, 0));
         assertEquals("hello", field.selectedText());
-        field.mouseDown(0, 0, 3, false);
+        field.pointerDown(new Pointer(0, 0, Pointer.Button.LEFT, 3, false, false, false, 0, 0));
         assertEquals("hello world", field.selectedText());
     }
 

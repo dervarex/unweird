@@ -13,6 +13,6 @@ interface Host {
     /** Shows {@code overlay} above everything, replacing any open overlay. */
     void openOverlay(Overlay overlay);
 
-    /** Closes the open overlay, if any. */
-    void closeOverlay();
+    /** Closes {@code overlay} (and anything opened on top of it). Does nothing if it isn't open. */
+    void closeOverlay(Overlay overlay);
 }

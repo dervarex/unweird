@@ -85,12 +85,27 @@ public class Example {
 | `Toggle` | `new Toggle("Dark mode").checked(true)` | Label left, switch right |
 | `Dropdown<T>` | `new Dropdown<>("Language", List.of(...)).labels(...)` | Popup above everything; keyboard-driven too |
 | `ListView<T>` | `new ListView<>(() -> tasks).onSelect(...)` | Live items; arrows select; `empty("...")` text |
+| `Slider` | `new Slider("Volume", 0, 100).step(5).onChange(v -> ...)` | Drag, arrows, Page Up/Down, wheel while focused |
 | `Image` | `new Image("/images/logo.png").size(56, 56)` | Classpath, `Image.file(path)` or `Image.url(...)` (background download); placeholder if missing |
 | `Component` | `class Sidebar extends Component { ... }` | Your own groups of widgets; `@Card` draws one on a padded surface |
 | `Each<T>` | `new Each<>(() -> results, ResultRow::new)` | One widget per item of a live list; rows keep their state while their item stays |
 
 Every widget can be shown or enabled conditionally, re-evaluated after every event:
 `.visibleIf(() -> ...)` (hidden widgets take no space) and `.enabledIf(() -> ...)` (dimmed, no input, skipped by Tab).
+
+### Writing your own widgets
+
+Extend `Widget`, implement `measure` and `draw` (with `Canvas`), and override the input hooks you need:
+
+| Hook | When |
+|---|---|
+| `focusable()`, `cursor()` | Can it take focus (Tab, click)? Which mouse cursor? |
+| `onPress(Pointer)` / `onDrag(Pointer)` / `onRelease(Pointer)` | Any mouse button; drags keep coming outside the widget until release; `dx`/`dy` per drag |
+| `onMove(Pointer)` | Hover movement; return true if it changes the drawing |
+| `onScroll(Pointer, dx, dy)` | Return true to use it, otherwise the page scrolls |
+| `onKey(KeyPress)` / `onType(String)` | While focused; `key.is("Ctrl+S")`, letters follow the keyboard layout |
+
+Handlers just change state; the UI re-evaluates and redraws after every event. `Slider` is built only on these hooks.
 
 ### Ready-made components (`unweird-components`)
 

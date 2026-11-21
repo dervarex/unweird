@@ -46,8 +46,7 @@ final class Window implements Host {
 
     private final long handle;
     private final long vg;
-    private final long handCursor;
-    private final long ibeamCursor;
+    private final java.util.EnumMap<Cursor, Long> cursors = new java.util.EnumMap<>(Cursor.class);
     private final ByteBuffer regularFontData;
     private final ByteBuffer semiboldFontData;
     private final Canvas canvas;
@@ -60,7 +59,11 @@ final class Window implements Host {
     private Widget hovered;
     private Widget pressed;
     private Widget focused;
-    private Overlay overlay;
+    /** Open overlays, bottom to top. The top one gets input. */
+    private final List<Overlay> overlays = new java.util.ArrayList<>();
+    private int pressedButton = -1;
+    private double lastDragX;
+    private double lastDragY;
     private double nextBlink;
 
     private int clickCount;
@@ -115,8 +118,6 @@ final class Window implements Host {
             throw new IllegalStateException("unweird: could not load the bundled fonts");
         }
         canvas = new Canvas(vg, regular, semibold, theme);
-        handCursor = glfwCreateStandardCursor(GLFW_POINTING_HAND_CURSOR);
-        ibeamCursor = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
 
         installCallbacks();
     }
@@ -130,7 +131,9 @@ final class Window implements Host {
             pressed.pressed = false;
             pressed = null;
         }
-        closeOverlay();
+        while (!overlays.isEmpty()) {
+            closeOverlay(overlays.getFirst());
+        }
         focus(null, false);
         screen = next;
         Title title = next.getClass().getAnnotation(Title.class);
@@ -197,8 +200,11 @@ final class Window implements Host {
         nvgDelete(vg);
         MemoryUtil.memFree(regularFontData);
         MemoryUtil.memFree(semiboldFontData);
-        glfwDestroyCursor(handCursor);
-        glfwDestroyCursor(ibeamCursor);
+        cursors.values().forEach(cursor -> {
+            if (cursor != NULL) {
+                glfwDestroyCursor(cursor);
+            }
+        });
         glfwDestroyWindow(handle);
         glfwTerminate();
         GLFWErrorCallback previous = glfwSetErrorCallback(null);
@@ -235,7 +241,7 @@ final class Window implements Host {
         if (screen != null) {
             screen.render(canvas, logicalWidth, logicalHeight);
         }
-        if (overlay != null) {
+        for (Overlay overlay : List.copyOf(overlays)) {
             overlay.update();
             overlay.position(canvas, logicalWidth, logicalHeight);
             overlay.draw(canvas);
@@ -253,14 +259,24 @@ final class Window implements Host {
         glfwSetCursorPosCallback(handle, (window, x, y) -> {
             cursorX = x;
             cursorY = y;
-            if (pressed != null && pressed.focusable()) {
-                pressed.mouseDrag(logical(x), logical(y));
+            if (pressed != null) {
+                Widget dragging = pressed;
+                float dx = (float) (x - lastDragX) * windowToLogical;
+                float dy = (float) (y - lastDragY) * windowToLogical;
+                lastDragX = x;
+                lastDragY = y;
+                safely(dragging, () -> dragging.pointerDrag(pointer(buttonOf(pressedButton), 0, dx, dy)));
                 resetBlink();
                 dirty.set(true);
             }
             updateHover();
-            if (hovered != null && hovered.mouseMoved(logical(x), logical(y))) {
-                dirty.set(true);
+            Widget over = hovered;
+            if (over != null && pressed == null) {
+                boolean[] changed = {false};
+                safely(over, () -> changed[0] = over.pointerMove(pointer(Pointer.Button.NONE, 0, 0, 0)));
+                if (changed[0]) {
+                    dirty.set(true);
+                }
             }
         });
         glfwSetCursorEnterCallback(handle, (window, entered) -> {
@@ -273,35 +289,48 @@ final class Window implements Host {
             updateHover();
         });
         glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
-            if (button != GLFW_MOUSE_BUTTON_LEFT) {
-                return;
-            }
             if (action == GLFW_PRESS) {
+                if (pressed != null) {
+                    return; // one button at a time
+                }
                 syncCursor(); // a press can arrive before any move event (e.g. right after entering the window)
                 updateHover();
-                countClicks();
-                if (overlay != null && !overlay.contains(logical(cursorX), logical(cursorY))) {
-                    closeOverlay(); // a click outside a popup only closes it
+                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                    countClicks();
+                }
+                Overlay top = topOverlay();
+                if (top != null && !top.modal() && !top.contains(logical(cursorX), logical(cursorY))) {
+                    closeOverlay(top); // a click outside a popup only closes it
                     return;
                 }
                 if (hovered == null) {
-                    focus(null, false); // clicking empty space drops focus
+                    if (top == null || !top.modal()) {
+                        focus(null, false); // clicking empty space drops focus
+                    }
                     return;
                 }
                 pressed = hovered;
-                pressed.pressed = true;
+                pressedButton = button;
+                lastDragX = cursorX;
+                lastDragY = cursorY;
+                pressed.pressed = button == GLFW_MOUSE_BUTTON_LEFT;
                 if (pressed.focusable()) {
                     focus(pressed, false);
-                    pressed.mouseDown(logical(cursorX), logical(cursorY), clickCount, (mods & GLFW_MOD_SHIFT) != 0);
                 }
+                Widget target = pressed;
+                int clicks = button == GLFW_MOUSE_BUTTON_LEFT ? clickCount : 1;
+                safely(target, () -> target.pointerDown(pointer(buttonOf(button), clicks, 0, 0)));
                 dirty.set(true);
-            } else if (action == GLFW_RELEASE && pressed != null) {
+            } else if (action == GLFW_RELEASE && pressed != null && button == pressedButton) {
                 Widget released = pressed;
                 pressed = null;
+                pressedButton = -1;
                 released.pressed = false;
-                if (released == hovered && released.clickable()) {
+                safely(released, () -> released.pointerUp(pointer(buttonOf(button), 0, 0, 0)));
+                if (button == GLFW_MOUSE_BUTTON_LEFT && released == hovered && released.clickable()) {
                     safely(released, () -> released.activate(this));
                 }
+                updateHover();
                 dirty.set(true);
             }
         });
@@ -310,30 +339,60 @@ final class Window implements Host {
                 return;
             }
             resetBlink();
-            if (key == GLFW_KEY_ESCAPE && overlay != null) {
-                closeOverlay();
-            } else if (key == GLFW_KEY_TAB) {
+            int code = layoutKey(key, scancode);
+            Overlay top = topOverlay();
+            if (code == GLFW_KEY_TAB) {
                 moveFocus((mods & GLFW_MOD_SHIFT) != 0 ? -1 : 1);
-            } else if (focused != null) {
-                focused.keyPressed(key, mods, this);
+            } else {
+                boolean[] used = {false};
+                Widget target = focused;
+                if (target != null) {
+                    safely(target, () -> used[0] = target.keyPressed(code, mods, this));
+                }
+                if (!used[0] && top != null) {
+                    if (code == GLFW_KEY_ESCAPE) {
+                        safely(top, top::escape);
+                        if (!top.modal()) {
+                            closeOverlay(top);
+                        }
+                        used[0] = true;
+                    } else if (top.modal()) {
+                        safely(top, () -> used[0] = top.keyPressed(code, mods, this));
+                    }
+                }
+                if (!used[0] && (top == null || !top.modal())) {
+                    shortcuts.accept(new KeyPress(code, mods, action == GLFW_REPEAT), focused);
+                }
             }
             dirty.set(true); // the key may have changed state that lambdas read
         });
         glfwSetCharCallback(handle, (window, codePoint) -> {
             resetBlink();
-            if (focused != null) {
-                focused.typed(codePoint, this);
+            Widget target = focused;
+            if (target != null) {
+                safely(target, () -> target.typed(codePoint, this));
             }
             dirty.set(true);
         });
         glfwSetScrollCallback(handle, (window, dx, dy) -> {
-            if (overlay != null) {
-                if (overlay.contains(logical(cursorX), logical(cursorY)) && overlay.scrolled(dy)) {
+            Pointer at = pointer(Pointer.Button.NONE, 0, 0, 0);
+            for (Widget w = hovered; w != null; w = w.parent) { // the widget under the mouse first, then its parents
+                Widget candidate = w;
+                boolean[] used = {false};
+                safely(candidate, () -> used[0] = candidate.scrolled(at, dx, dy));
+                if (used[0]) {
+                    dirty.set(true);
+                    return;
+                }
+            }
+            Overlay top = topOverlay();
+            if (top != null) {
+                if (top.contains(at.x(), at.y()) && top.scrolled(at, dx, dy)) {
                     dirty.set(true);
                 }
-                return; // the page doesn't scroll away under an open popup
+                return; // the page doesn't scroll away under an open popup or dialog
             }
-            if (screen != null && screen.scrollBy(logical(cursorX), logical(cursorY), dy)) {
+            if (screen != null && screen.scrollBy(at.x(), at.y(), dy)) {
                 dirty.set(true);
             }
         });
@@ -342,12 +401,20 @@ final class Window implements Host {
         glfwSetWindowRefreshCallback(handle, window -> render());
     }
 
+    /** Called for keys nobody used: screen, component and app-wide shortcuts. Set by {@link Unweird}. */
+    java.util.function.BiConsumer<KeyPress, Widget> shortcuts = (key, focus) -> { };
+
     private void updateHover() {
         Widget target = null;
-        if (overlay != null) {
-            target = cursorX >= 0 && overlay.contains(logical(cursorX), logical(cursorY)) ? overlay : null;
-        } else if (screen != null && cursorX >= 0 && cursorY >= 0) {
-            target = screen.hitTest(logical(cursorX), logical(cursorY));
+        if (cursorX >= 0 && cursorY >= 0) {
+            float x = logical(cursorX);
+            float y = logical(cursorY);
+            Overlay top = topOverlay();
+            if (top != null) {
+                target = top.contains(x, y) || top.modal() ? top.hitTest(x, y) : null;
+            } else if (screen != null) {
+                target = screen.hitTest(x, y);
+            }
         }
         if (target != hovered) {
             if (hovered != null) {
@@ -357,15 +424,68 @@ final class Window implements Host {
             if (target != null) {
                 target.hovered = true;
             }
-            // while dragging a selection, keep the I-beam even when leaving the field
-            Widget shapeSource = pressed != null ? pressed : target;
-            glfwSetCursor(handle, shapeSource == null ? NULL : switch (shapeSource.cursorShape()) {
-                case HAND -> handCursor;
-                case IBEAM -> ibeamCursor;
-                case ARROW -> NULL;
-            });
             dirty.set(true);
         }
+        // while dragging (e.g. a text selection), keep the pressed widget's cursor even outside it
+        Widget shapeSource = pressed != null ? pressed : hovered;
+        glfwSetCursor(handle, shapeSource == null ? NULL : cursorHandle(shapeSource.cursor()));
+    }
+
+    private long cursorHandle(Cursor cursor) {
+        return cursors.computeIfAbsent(cursor, c -> glfwCreateStandardCursor(switch (c) {
+            case ARROW -> GLFW_ARROW_CURSOR;
+            case HAND -> GLFW_POINTING_HAND_CURSOR;
+            case TEXT -> GLFW_IBEAM_CURSOR;
+            case CROSSHAIR -> GLFW_CROSSHAIR_CURSOR;
+            case MOVE -> GLFW_RESIZE_ALL_CURSOR;
+            case RESIZE_HORIZONTAL -> GLFW_RESIZE_EW_CURSOR;
+            case RESIZE_VERTICAL -> GLFW_RESIZE_NS_CURSOR;
+            case NOT_ALLOWED -> GLFW_NOT_ALLOWED_CURSOR;
+        }));
+    }
+
+    private Pointer pointer(Pointer.Button button, int clicks, float dx, float dy) {
+        boolean shift = glfwGetKey(handle, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(handle, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+        boolean ctrl = glfwGetKey(handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || glfwGetKey(handle, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+        boolean alt = glfwGetKey(handle, GLFW_KEY_LEFT_ALT) == GLFW_PRESS || glfwGetKey(handle, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
+        return new Pointer(logical(cursorX), logical(cursorY), button, clicks, shift, ctrl, alt, dx, dy);
+    }
+
+    private static Pointer.Button buttonOf(int glfwButton) {
+        return switch (glfwButton) {
+            case GLFW_MOUSE_BUTTON_LEFT -> Pointer.Button.LEFT;
+            case GLFW_MOUSE_BUTTON_RIGHT -> Pointer.Button.RIGHT;
+            case GLFW_MOUSE_BUTTON_MIDDLE -> Pointer.Button.MIDDLE;
+            default -> Pointer.Button.NONE;
+        };
+    }
+
+    /** Letter keys as the keyboard layout labels them (Ctrl+Z is the key with Z on it, also on QWERTZ). */
+    private static int layoutKey(int key, int scancode) {
+        if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z) {
+            String name = glfwGetKeyName(key, scancode);
+            if (name != null && name.length() == 1) {
+                char c = Character.toLowerCase(name.charAt(0));
+                if (c >= 'a' && c <= 'z') {
+                    return GLFW_KEY_A + (c - 'a');
+                }
+            }
+        }
+        return key;
+    }
+
+    private Overlay topOverlay() {
+        return overlays.isEmpty() ? null : overlays.getLast();
+    }
+
+    /** The topmost modal overlay (a dialog), or null. Input below it is blocked. */
+    private Overlay modalOverlay() {
+        for (int i = overlays.size() - 1; i >= 0; i--) {
+            if (overlays.get(i).modal()) {
+                return overlays.get(i);
+            }
+        }
+        return null;
     }
 
     /** Reads the real cursor position, in case no move event told us yet. */
@@ -382,8 +502,9 @@ final class Window implements Host {
     }
 
     private void focus(Widget next, boolean viaKeyboard) {
-        if (overlay != null && overlay.owner() != next) {
-            closeOverlay();
+        Overlay top = topOverlay();
+        if (top != null && !top.modal() && top.owner() != next) {
+            closeOverlay(top); // focus moving away closes a popup
         }
         if (focused == next) {
             if (next != null) {
@@ -409,7 +530,8 @@ final class Window implements Host {
         if (screen == null) {
             return;
         }
-        List<Widget> order = screen.tabOrder();
+        Overlay modal = modalOverlay();
+        List<Widget> order = modal != null ? modal.focusables() : screen.tabOrder(); // a dialog keeps Tab inside it
         if (order.isEmpty()) {
             return;
         }
@@ -422,7 +544,9 @@ final class Window implements Host {
             field.selectAllForTab();
         }
         focus(target, true);
-        screen.reveal(target);
+        if (modal == null) {
+            screen.reveal(target);
+        }
     }
 
     private void resetBlink() {
@@ -446,27 +570,57 @@ final class Window implements Host {
 
     @Override
     public void openOverlay(Overlay next) {
-        closeOverlay();
-        overlay = next;
+        // a new popup replaces open popups above the topmost dialog; dialogs stack
+        Overlay top;
+        while ((top = topOverlay()) != null && !top.modal() && !next.modal()) {
+            closeOverlay(top);
+        }
+        overlays.add(next);
+        if (next.modal()) {
+            Widget first = next.focusables().stream().findFirst().orElse(null);
+            focus(first, false);
+        }
+        updateHover();
         dirty.set(true);
     }
 
     @Override
-    public void closeOverlay() {
-        Overlay closing = overlay;
-        if (closing == null) {
+    public void closeOverlay(Overlay closing) {
+        int index = overlays.indexOf(closing);
+        if (index < 0) {
             return;
         }
-        overlay = null;
-        if (hovered == closing) {
-            hovered.hovered = false;
-            hovered = null;
+        while (overlays.size() > index) { // anything opened on top of it goes too
+            Overlay removed = overlays.removeLast();
+            if (isInside(hovered, removed)) {
+                hovered.hovered = false;
+                hovered = null;
+            }
+            if (isInside(pressed, removed)) {
+                pressed.pressed = false;
+                pressed = null;
+            }
+            if (isInside(focused, removed)) {
+                focused.focused = false;
+                focused.focusVisible = false;
+                focused = null;
+            }
+            removed.closed();
         }
-        if (pressed == closing) {
-            pressed = null;
+        Overlay top = topOverlay();
+        if (focused == null && top != null && top.modal()) {
+            focus(top.focusables().stream().findFirst().orElse(null), false);
         }
-        closing.closed();
         dirty.set(true);
+    }
+
+    private static boolean isInside(Widget widget, Overlay overlay) {
+        for (Widget w = widget; w != null; w = w.parent) {
+            if (w == overlay) {
+                return true;
+            }
+        }
+        return widget != null && overlay.owns(widget);
     }
 
     @Override

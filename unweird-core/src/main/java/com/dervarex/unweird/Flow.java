@@ -96,7 +96,7 @@ final class Flow {
                     return false;
                 }
             } else if (!(child instanceof Text || child instanceof Field || child instanceof Dropdown<?>
-                    || child instanceof Button || child instanceof Choice<?> || child instanceof Image)) {
+                    || child instanceof Button || child instanceof Choice<?> || child instanceof Image || child instanceof Slider)) {
                 return false;
             }
         }

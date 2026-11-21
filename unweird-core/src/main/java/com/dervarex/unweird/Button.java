@@ -115,7 +115,7 @@ public class Button extends Widget {
     }
 
     @Override
-    boolean focusable() {
+    protected boolean focusable() {
         return true;
     }
 

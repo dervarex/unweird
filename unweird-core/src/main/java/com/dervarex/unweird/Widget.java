@@ -14,8 +14,6 @@ import java.util.function.BooleanSupplier;
  */
 public abstract class Widget {
 
-    enum CursorShape { ARROW, HAND, IBEAM }
-
     @Getter(AccessLevel.PROTECTED) private float x;
     @Getter(AccessLevel.PROTECTED) private float y;
     @Getter(AccessLevel.PROTECTED) private float width;
@@ -175,41 +173,85 @@ public abstract class Widget {
         click();
     }
 
-    // ---- input; package-private until custom-widget input gets a public API ----
+    // ---- input for custom widgets ----
+    //
+    // A widget gets pointer events when it's clickable() or focusable(), and key events while it has focus.
+    // After every event the UI re-evaluates and redraws, so handlers just change state.
 
-    boolean focusable() {
+    /** Whether this widget can take keyboard focus (Tab, click). */
+    protected boolean focusable() {
         return false;
     }
 
-    /** Handles a key press (or repeat). Returns whether the key was used. Keys are GLFW key codes. */
+    /** The mouse cursor over this widget. */
+    protected Cursor cursor() {
+        return clickable() ? Cursor.HAND : Cursor.ARROW;
+    }
+
+    /** A mouse button went down on this widget (any button). It keeps getting {@link #onDrag} until release. */
+    protected void onPress(Pointer pointer) {
+    }
+
+    /** The mouse moved while a button is held after {@link #onPress}, also outside the widget. */
+    protected void onDrag(Pointer pointer) {
+    }
+
+    /** The button from {@link #onPress} was released (anywhere). */
+    protected void onRelease(Pointer pointer) {
+    }
+
+    /** The mouse moved over this widget without a button held. Return true if that changes what's drawn. */
+    protected boolean onMove(Pointer pointer) {
+        return false;
+    }
+
+    /** Mouse wheel / touchpad scroll over this widget. Return true to use it (otherwise the page scrolls). */
+    protected boolean onScroll(Pointer at, double dx, double dy) {
+        return false;
+    }
+
+    /** A key was pressed (or repeats) while this widget has focus. Return true if it was used. */
+    protected boolean onKey(KeyPress key) {
+        return false;
+    }
+
+    /** Text was typed while this widget has focus (already translated by the keyboard layout). */
+    protected void onType(String text) {
+    }
+
+    // ---- internal input paths (built-in widgets override these; the defaults call the public hooks) ----
+
     boolean keyPressed(int key, int mods, Host host) {
-        return false;
+        return onKey(new KeyPress(key, mods, false));
     }
 
-    /** A typed character (already translated by the keyboard layout). */
     void typed(int codePoint, Host host) {
+        onType(Character.toString(codePoint));
     }
 
-    /** Mouse went down on this widget. {@code clicks} counts quick successive clicks (2 = double click). */
-    void mouseDown(float px, float py, int clicks, boolean shift) {
+    void pointerDown(Pointer pointer) {
+        onPress(pointer);
     }
 
-    /** The mouse moved over this widget (only called for the hovered interactive widget). Returns whether anything visible changed. */
-    boolean mouseMoved(float px, float py) {
-        return false;
+    boolean pointerMove(Pointer pointer) {
+        return onMove(pointer);
     }
 
-    /** Mouse moved while the button is held after {@link #mouseDown}. */
-    void mouseDrag(float px, float py) {
+    void pointerDrag(Pointer pointer) {
+        onDrag(pointer);
+    }
+
+    void pointerUp(Pointer pointer) {
+        onRelease(pointer);
+    }
+
+    boolean scrolled(Pointer at, double dx, double dy) {
+        return onScroll(at, dx, dy);
     }
 
     /** Whether the window should blink a caret while this widget is focused. */
     boolean blinks() {
         return false;
-    }
-
-    CursorShape cursorShape() {
-        return CursorShape.HAND;
     }
 
     final boolean interactive() {
