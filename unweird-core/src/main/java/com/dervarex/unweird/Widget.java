@@ -128,6 +128,11 @@ public abstract class Widget {
     protected void click() {
     }
 
+    /** A mouse click as the window delivers it. Widgets that need the window (e.g. to open a popup) override this. */
+    void activate(Host host) {
+        click();
+    }
+
     // ---- input; package-private until custom-widget input gets a public API ----
 
     boolean focusable() {

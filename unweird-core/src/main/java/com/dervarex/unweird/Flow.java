@@ -95,7 +95,7 @@ final class Flow {
                 if (!formLike(nested)) {
                     return false;
                 }
-            } else if (!(child instanceof Text || child instanceof Field || child instanceof Button || child instanceof Choice<?>)) {
+            } else if (!(child instanceof Text || isInput(child) || child instanceof Button || child instanceof Choice<?>)) {
                 return false;
             }
         }
@@ -270,19 +270,19 @@ final class Flow {
             boolean headingBlock = (ta.resolved == Text.Role.HEADING || ta.resolved == Text.Role.TITLE) && tb.resolved == Text.Role.SUBTITLE;
             return headingBlock ? 6 : 12;
         }
-        if (a instanceof Field && b instanceof Field) {
+        if (isInput(a) && isInput(b)) {
             return 10;
         }
         if (a instanceof Choice<?> && b instanceof Choice<?>) {
             return 8;
         }
-        if (a instanceof Field && b instanceof Choice<?>) {
+        if (isInput(a) && b instanceof Choice<?>) {
             return 12;
         }
-        if (a instanceof Text && (b instanceof Field || b instanceof Button)) {
+        if (a instanceof Text && (isInput(b) || b instanceof Button)) {
             return mode == Mode.CARD ? 28 : 20;
         }
-        if ((a instanceof Field || a instanceof Choice<?>) && b instanceof Button) {
+        if ((isInput(a) || a instanceof Choice<?>) && b instanceof Button) {
             return 20;
         }
         return 16;
@@ -312,7 +312,7 @@ final class Flow {
         int flexible = 0;
         for (int i = 0; i < row.size(); i++) {
             Widget widget = row.get(i);
-            if (widget instanceof Field || widget instanceof Container) {
+            if (isInput(widget) || widget instanceof Container) {
                 flexible++;
             } else {
                 widths[i] = widget.measure(canvas, Math.max(0, width - used)).width();
@@ -322,7 +322,7 @@ final class Flow {
         if (flexible > 0) {
             float share = Math.max(0, (width - used) / flexible);
             for (int i = 0; i < row.size(); i++) {
-                if (row.get(i) instanceof Field || row.get(i) instanceof Container) {
+                if (isInput(row.get(i)) || row.get(i) instanceof Container) {
                     widths[i] = share;
                 }
             }
@@ -361,6 +361,11 @@ final class Flow {
             widget.place(canvas, cx, y + (rowHeight - h) / 2, widths[i], h);
             cx += widths[i];
         }
+    }
+
+    /** Fields and dropdowns: boxes you fill in, which stretch to the available width. */
+    private static boolean isInput(Widget widget) {
+        return widget instanceof Field || widget instanceof Dropdown<?>;
     }
 
     private static float itemGap(Widget widget) {

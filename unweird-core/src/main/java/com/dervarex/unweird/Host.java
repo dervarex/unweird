@@ -9,4 +9,10 @@ interface Host {
 
     /** Runs user code (a handler); an exception is reported instead of crashing the app. {@code source} may be null. */
     void safely(Widget source, Runnable handler);
+
+    /** Shows {@code overlay} above everything, replacing any open overlay. */
+    void openOverlay(Overlay overlay);
+
+    /** Closes the open overlay, if any. */
+    void closeOverlay();
 }

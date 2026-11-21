@@ -60,6 +60,7 @@ final class Window implements Host {
     private Widget hovered;
     private Widget pressed;
     private Widget focused;
+    private Overlay overlay;
     private double nextBlink;
 
     private int clickCount;
@@ -129,6 +130,7 @@ final class Window implements Host {
             pressed.pressed = false;
             pressed = null;
         }
+        closeOverlay();
         focus(null, false);
         screen = next;
         Title title = next.getClass().getAnnotation(Title.class);
@@ -228,8 +230,15 @@ final class Window implements Host {
 
         nvgBeginFrame(vg, fbWidth[0] / scale, fbHeight[0] / scale, scale);
         canvas.setTheme(theme);
+        float logicalWidth = fbWidth[0] / scale;
+        float logicalHeight = fbHeight[0] / scale;
         if (screen != null) {
-            screen.render(canvas, fbWidth[0] / scale, fbHeight[0] / scale);
+            screen.render(canvas, logicalWidth, logicalHeight);
+        }
+        if (overlay != null) {
+            overlay.update();
+            overlay.position(canvas, logicalWidth, logicalHeight);
+            overlay.draw(canvas);
         }
         nvgEndFrame(vg);
         glfwSwapBuffers(handle);
@@ -244,6 +253,9 @@ final class Window implements Host {
             if (pressed != null && pressed.focusable()) {
                 pressed.mouseDrag(logical(x), logical(y));
                 resetBlink();
+                dirty.set(true);
+            }
+            if (overlay != null && overlay.contains(logical(x), logical(y)) && overlay.mouseMoved(logical(x), logical(y))) {
                 dirty.set(true);
             }
             updateHover();
@@ -261,6 +273,10 @@ final class Window implements Host {
             }
             if (action == GLFW_PRESS) {
                 countClicks();
+                if (overlay != null && !overlay.contains(logical(cursorX), logical(cursorY))) {
+                    closeOverlay(); // a click outside a popup only closes it
+                    return;
+                }
                 if (hovered == null) {
                     focus(null, false); // clicking empty space drops focus
                     return;
@@ -277,7 +293,7 @@ final class Window implements Host {
                 pressed = null;
                 released.pressed = false;
                 if (released == hovered && released.clickable()) {
-                    safely(released, released::click);
+                    safely(released, () -> released.activate(this));
                 }
                 dirty.set(true);
             }
@@ -287,7 +303,9 @@ final class Window implements Host {
                 return;
             }
             resetBlink();
-            if (key == GLFW_KEY_TAB) {
+            if (key == GLFW_KEY_ESCAPE && overlay != null) {
+                closeOverlay();
+            } else if (key == GLFW_KEY_TAB) {
                 moveFocus((mods & GLFW_MOD_SHIFT) != 0 ? -1 : 1);
             } else if (focused != null) {
                 focused.keyPressed(key, mods, this);
@@ -302,6 +320,12 @@ final class Window implements Host {
             dirty.set(true);
         });
         glfwSetScrollCallback(handle, (window, dx, dy) -> {
+            if (overlay != null) {
+                if (overlay.contains(logical(cursorX), logical(cursorY)) && overlay.scrolled(dy)) {
+                    dirty.set(true);
+                }
+                return; // the page doesn't scroll away under an open popup
+            }
             if (screen != null && screen.scrollBy(logical(cursorX), logical(cursorY), dy)) {
                 dirty.set(true);
             }
@@ -313,7 +337,9 @@ final class Window implements Host {
 
     private void updateHover() {
         Widget target = null;
-        if (screen != null && cursorX >= 0 && cursorY >= 0) {
+        if (overlay != null) {
+            target = cursorX >= 0 && overlay.contains(logical(cursorX), logical(cursorY)) ? overlay : null;
+        } else if (screen != null && cursorX >= 0 && cursorY >= 0) {
             target = screen.hitTest(logical(cursorX), logical(cursorY));
         }
         if (target != hovered) {
@@ -340,6 +366,9 @@ final class Window implements Host {
     }
 
     private void focus(Widget next, boolean viaKeyboard) {
+        if (overlay != null && overlay.owner() != next) {
+            closeOverlay();
+        }
         if (focused == next) {
             if (next != null) {
                 next.focusVisible = viaKeyboard;
@@ -398,6 +427,31 @@ final class Window implements Host {
     }
 
     // ---- Host ----
+
+    @Override
+    public void openOverlay(Overlay next) {
+        closeOverlay();
+        overlay = next;
+        dirty.set(true);
+    }
+
+    @Override
+    public void closeOverlay() {
+        Overlay closing = overlay;
+        if (closing == null) {
+            return;
+        }
+        overlay = null;
+        if (hovered == closing) {
+            hovered.hovered = false;
+            hovered = null;
+        }
+        if (pressed == closing) {
+            pressed = null;
+        }
+        closing.closed();
+        dirty.set(true);
+    }
 
     @Override
     public String clipboard() {

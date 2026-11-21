@@ -15,7 +15,7 @@ import static org.lwjgl.glfw.GLFW.*;
 @DisabledOnOs(OS.MAC)
 class FieldTest {
 
-    static final class FakeHost implements Host {
+    static class FakeHost implements Host {
         String clipboard = "";
         final List<RuntimeException> errors = new ArrayList<>();
 
@@ -35,6 +35,23 @@ class FieldTest {
                 handler.run();
             } catch (RuntimeException e) {
                 errors.add(e);
+            }
+        }
+
+        Overlay overlay;
+
+        @Override
+        public void openOverlay(Overlay next) {
+            closeOverlay();
+            overlay = next;
+        }
+
+        @Override
+        public void closeOverlay() {
+            Overlay closing = overlay;
+            overlay = null;
+            if (closing != null) {
+                closing.closed();
             }
         }
     }
