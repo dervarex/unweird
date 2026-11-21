@@ -178,6 +178,9 @@ public class Field extends Widget {
                 replaceSelection("", host);
             }
             case GLFW_KEY_ENTER, GLFW_KEY_KP_ENTER -> {
+                if (submitHandlers.isEmpty()) {
+                    return false; // let a dialog's default action have it
+                }
                 for (Runnable handler : submitHandlers) {
                     host.safely(this, handler);
                 }

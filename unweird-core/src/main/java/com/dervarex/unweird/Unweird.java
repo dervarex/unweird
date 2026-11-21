@@ -88,6 +88,32 @@ public final class Unweird {
         return current.schedule(delay.toMillis() / 1000.0, action);
     }
 
+    /** Opens {@code dialog} above everything. Thread-safe. Inside screens and components, just call {@code show(dialog)}. */
+    public static void show(Dialog dialog) {
+        Objects.requireNonNull(dialog, "dialog");
+        Window current = window;
+        if (current == null) {
+            throw new IllegalStateException("unweird isn't running; dialogs can be shown after Unweird.start(...)");
+        }
+        current.runOnUiThread(() -> {
+            if (dialog.layer != null) {
+                return; // already open
+            }
+            ModalLayer layer = new ModalLayer(dialog);
+            dialog.layer = layer;
+            current.openOverlay(layer);
+        });
+    }
+
+    static void closeOverlay(Overlay overlay) {
+        Window current = window;
+        if (current != null) {
+            current.runOnUiThread(() -> current.closeOverlay(overlay));
+        } else {
+            overlay.closed();
+        }
+    }
+
     /** Shows a short message in the corner. Thread-safe. */
     public static void toast(String message) {
         toast(Toast.info(message));

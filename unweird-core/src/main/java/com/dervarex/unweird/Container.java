@@ -39,6 +39,11 @@ public abstract class Container extends Widget {
         children = null;
     }
 
+    /** Children that always come after the declared ones (a dialog's buttons). Re-read whenever children are resolved. */
+    List<Widget> trailingChildren() {
+        return List.of();
+    }
+
     /** Replaces the children (used by {@link Each}). Widgets that are no longer children are released. */
     final void replaceChildren(List<Widget> next) {
         if (children != null) {
@@ -52,6 +57,11 @@ public abstract class Container extends Widget {
         }
         manual = new ArrayList<>(next);
         children = null;
+    }
+
+    /** Opens a dialog above everything; see {@link Dialog}. */
+    protected final void show(Dialog dialog) {
+        Unweird.show(dialog);
     }
 
     /** Background work with the result on the UI thread: {@code async(() -> load()).then(r -> ...)}. See {@link Async}. */
@@ -89,7 +99,8 @@ public abstract class Container extends Widget {
 
     final List<Widget> children() {
         if (children == null) {
-            List<Widget> resolved = manual != null ? List.copyOf(manual) : FieldIndex.widgetsOf(this);
+            List<Widget> resolved = new ArrayList<>(manual != null ? manual : FieldIndex.widgetsOf(this));
+            resolved.addAll(trailingChildren());
             Set<Widget> seen = Collections.newSetFromMap(new IdentityHashMap<>());
             for (Widget child : resolved) {
                 if (child == this) {

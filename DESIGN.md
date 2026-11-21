@@ -269,6 +269,21 @@ A relation to a text that's currently empty (hidden) is ignored until that text 
 - Buttons can have live labels, too: `new Button(() -> dark ? "Light mode" : "Dark mode")`.
 - No CSS files.
 
+## Dialogs
+
+```java
+show(Dialog.confirm("Delete “My world”?", "This can't be undone.")
+        .action("Delete", this::delete).danger()
+        .cancel("Keep it"));
+```
+
+- Modal: a dimmed backdrop blocks everything below; Tab stays inside; Escape cancels.
+- Actions close the dialog after running, unless the handler calls `stay()` (e.g. invalid input).
+- The first action is the default: Enter runs it unless the focused widget uses Enter itself.
+  Focus starts on the first input, else on Cancel, so Enter never confirms something destructive by accident.
+- Forms: subclass `Dialog` and declare fields like on a screen; they go between the message and the buttons.
+- Popups (a dropdown inside a dialog) open on top of it; overlays are a stack.
+
 ## Background work, timers and toasts
 
 ```java

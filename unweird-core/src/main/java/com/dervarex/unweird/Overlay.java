@@ -24,6 +24,11 @@ abstract class Overlay extends Widget {
     void escape() {
     }
 
+    /** Where focus goes when a modal overlay opens. */
+    Widget initialFocus() {
+        return focusables().stream().findFirst().orElse(null);
+    }
+
     /** Tab order inside a modal overlay. */
     List<Widget> focusables() {
         return List.of();

@@ -16,6 +16,7 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 
-    // Tests declare Screen subclasses, so they need the field-order index too.
+    // Core's own components (Dialog, ...) and the tests' screens need the field-order index too.
+    annotationProcessor(project(":unweird-processor"))
     testAnnotationProcessor(project(":unweird-processor"))
 }

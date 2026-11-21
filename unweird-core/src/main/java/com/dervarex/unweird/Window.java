@@ -718,8 +718,7 @@ final class Window implements Host {
         }
         overlays.add(next);
         if (next.modal()) {
-            Widget first = next.focusables().stream().findFirst().orElse(null);
-            focus(first, false);
+            focus(next.initialFocus(), false);
         }
         updateHover();
         dirty.set(true);
