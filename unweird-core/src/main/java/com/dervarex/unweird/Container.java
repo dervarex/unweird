@@ -54,6 +54,21 @@ public abstract class Container extends Widget {
         children = null;
     }
 
+    /** Background work with the result on the UI thread: {@code async(() -> load()).then(r -> ...)}. See {@link Async}. */
+    protected final <T> Async<T> async(java.util.concurrent.Callable<T> work) {
+        return Unweird.async(work);
+    }
+
+    /** Shows a short message in the corner. */
+    protected final void toast(String message) {
+        Unweird.toast(message);
+    }
+
+    /** Shows a toast, e.g. {@code toast(Toast.error("Couldn't save"))}. */
+    protected final void toast(Toast toast) {
+        Unweird.toast(toast);
+    }
+
     /** Redraws soon. Only needed after changing state from a thread other than the UI thread. */
     protected final void refresh() {
         Unweird.refresh();

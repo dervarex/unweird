@@ -59,6 +59,51 @@ public final class Unweird {
         return Defaults.shared(Objects.requireNonNull(type, "type"));
     }
 
+    /**
+     * Runs {@code work} on a background (virtual) thread; {@code then}/{@code failed} handlers run on the UI thread.
+     * Inside screens and components, just call {@code async(...)}.
+     */
+    public static <T> Async<T> async(java.util.concurrent.Callable<T> work) {
+        return Async.start(work);
+    }
+
+    /** Runs {@code action} on the UI thread after the current event (or right away if unweird isn't running). Thread-safe. */
+    public static void later(Runnable action) {
+        Objects.requireNonNull(action, "action");
+        Window current = window;
+        if (current == null) {
+            action.run();
+        } else {
+            current.runOnUiThread(() -> current.uiTasksLater(action));
+        }
+    }
+
+    /** Runs {@code action} on the UI thread after {@code delay}. Thread-safe. Returns something to cancel it with. */
+    public static Runnable after(java.time.Duration delay, Runnable action) {
+        Objects.requireNonNull(action, "action");
+        Window current = window;
+        if (current == null) {
+            throw new IllegalStateException("unweird isn't running; after(...) works after Unweird.start(...)");
+        }
+        return current.schedule(delay.toMillis() / 1000.0, action);
+    }
+
+    /** Shows a short message in the corner. Thread-safe. */
+    public static void toast(String message) {
+        toast(Toast.info(message));
+    }
+
+    /** Shows a toast, e.g. {@code Unweird.toast(Toast.error("Couldn't connect"))}. Thread-safe. */
+    public static void toast(Toast toast) {
+        Objects.requireNonNull(toast, "toast");
+        Window current = window;
+        if (current == null) {
+            System.out.println("unweird: [" + toast.kind() + "] " + toast.message());
+            return;
+        }
+        current.runOnUiThread(() -> current.toast(toast));
+    }
+
     /** The current theme. */
     public static Theme theme() {
         return theme;

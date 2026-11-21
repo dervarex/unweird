@@ -52,6 +52,11 @@ final class Window implements Host {
     private final Canvas canvas;
     private final AtomicBoolean dirty = new AtomicBoolean(true);
     private final Queue<Runnable> uiTasks = new ConcurrentLinkedQueue<>();
+    /** Timers by due time (glfwGetTime seconds). Guarded by itself. */
+    private final java.util.PriorityQueue<Timer> timers = new java.util.PriorityQueue<>();
+    private long timerSequence;
+    /** Visible toasts, oldest first. UI thread only. */
+    private final List<ShownToast> toasts = new java.util.ArrayList<>();
     private final Thread uiThread = Thread.currentThread();
 
     private Theme theme;
@@ -160,6 +165,130 @@ final class Window implements Host {
         glfwPostEmptyEvent();
     }
 
+    /** Runs {@code task} on the UI thread after {@code seconds}. Thread-safe. Returns a handle to cancel it. */
+    Runnable schedule(double seconds, Runnable task) {
+        Timer timer;
+        synchronized (timers) {
+            timer = new Timer(glfwGetTime() + Math.max(0, seconds), timerSequence++, task);
+            timers.add(timer);
+        }
+        if (Thread.currentThread() != uiThread) {
+            glfwPostEmptyEvent(); // wake the loop so it recomputes how long to sleep
+        }
+        return () -> {
+            synchronized (timers) {
+                timers.remove(timer);
+            }
+        };
+    }
+
+    private void runDueTimers() {
+        double now = glfwGetTime();
+        while (true) {
+            Timer due;
+            synchronized (timers) {
+                Timer next = timers.peek();
+                if (next == null || next.due > now) {
+                    return;
+                }
+                due = timers.poll();
+            }
+            safely(null, due.task);
+            dirty.set(true);
+        }
+    }
+
+    private double nextTimerDue() {
+        synchronized (timers) {
+            Timer next = timers.peek();
+            return next == null ? Double.MAX_VALUE : next.due;
+        }
+    }
+
+    private record Timer(double due, long sequence, Runnable task) implements Comparable<Timer> {
+        @Override
+        public int compareTo(Timer other) {
+            int byTime = Double.compare(due, other.due);
+            return byTime != 0 ? byTime : Long.compare(sequence, other.sequence);
+        }
+    }
+
+    // ---- toasts ----
+
+    private static final int MAX_TOASTS = 4;
+    private static final float TOAST_WIDTH = 340;
+
+    private static final class ShownToast {
+        final Toast toast;
+        float x;
+        float y;
+        float width;
+        float height;
+
+        ShownToast(Toast toast) {
+            this.toast = toast;
+        }
+    }
+
+    /** UI thread. */
+    void toast(Toast toast) {
+        ShownToast shown = new ShownToast(toast);
+        toasts.add(shown);
+        while (toasts.size() > MAX_TOASTS) {
+            toasts.removeFirst();
+        }
+        schedule(toast.duration().toMillis() / 1000.0, () -> toasts.remove(shown));
+        dirty.set(true);
+    }
+
+    private void drawToasts(float windowWidth, float windowHeight) {
+        var theme = canvas.getTheme();
+        float y = windowHeight - 20;
+        for (int i = toasts.size() - 1; i >= 0; i--) { // newest at the bottom
+            ShownToast shown = toasts.get(i);
+            float width = Math.min(TOAST_WIDTH, windowWidth - 40);
+            float textWidth = width - 44;
+            Size text = canvas.measureText(shown.toast.message(), Canvas.Weight.REGULAR, 14, textWidth);
+            float height = Math.max(44, text.height() + 24);
+            y -= height;
+            shown.x = windowWidth - 20 - width;
+            shown.y = y;
+            shown.width = width;
+            shown.height = height;
+            var stripe = switch (shown.toast.kind()) {
+                case INFO -> theme.getAccent();
+                case SUCCESS -> theme.getSuccess();
+                case ERROR -> theme.getDanger();
+            };
+            float radius = theme.getRadius() * 1.25f;
+            canvas.shadow(shown.x, shown.y, width, height, radius, 18, theme.getShadow().withAlpha(Math.min(1, theme.getShadow().a() * 2)));
+            canvas.fillRect(shown.x, shown.y, width, height, radius, theme.getSurface());
+            canvas.strokeRect(shown.x, shown.y, width, height, radius, 1, theme.getBorder());
+            canvas.fillRect(shown.x + 12, shown.y + 12, 4, height - 24, 2, stripe);
+            canvas.text(shown.toast.message(), shown.x + 28, shown.y + (height - text.height()) / 2, textWidth, Canvas.Weight.REGULAR, 14,
+                    theme.getText(), Canvas.Align.LEFT);
+            y -= 10;
+        }
+    }
+
+    /** A click on a toast dismisses it. Returns whether the click hit one. */
+    private boolean dismissToastAt(float x, float y) {
+        for (ShownToast shown : toasts) {
+            if (x >= shown.x && y >= shown.y && x < shown.x + shown.width && y < shown.y + shown.height) {
+                toasts.remove(shown);
+                dirty.set(true);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Queues {@code task} for the next loop iteration, even when called on the UI thread. */
+    void uiTasksLater(Runnable task) {
+        uiTasks.add(task);
+        dirty.set(true);
+    }
+
     /** Runs {@code task} on the UI thread: right away if we're on it, otherwise as soon as the loop wakes up. */
     void runOnUiThread(Runnable task) {
         if (Thread.currentThread() == uiThread) {
@@ -177,19 +306,27 @@ final class Window implements Host {
             for (Runnable task; (task = uiTasks.poll()) != null; ) {
                 safely(null, task);
             }
+            runDueTimers();
+            if (focused != null && focused.blinks() && glfwGetTime() >= nextBlink) {
+                focused.caretOn = !focused.caretOn;
+                nextBlink = glfwGetTime() + BLINK_SECONDS;
+                dirty.set(true);
+            }
             if (dirty.getAndSet(false)) {
                 render();
-            } else if (focused != null && focused.blinks()) {
-                double wait = nextBlink - glfwGetTime();
-                if (wait <= 0) {
-                    focused.caretOn = !focused.caretOn;
-                    nextBlink = glfwGetTime() + BLINK_SECONDS;
-                    dirty.set(true);
-                } else {
+                continue;
+            }
+            double wake = nextTimerDue();
+            if (focused != null && focused.blinks()) {
+                wake = Math.min(wake, nextBlink);
+            }
+            if (wake == Double.MAX_VALUE) {
+                glfwWaitEvents();
+            } else {
+                double wait = wake - glfwGetTime();
+                if (wait > 0) {
                     glfwWaitEventsTimeout(wait);
                 }
-            } else {
-                glfwWaitEvents();
             }
         }
     }
@@ -246,6 +383,7 @@ final class Window implements Host {
             overlay.position(canvas, logicalWidth, logicalHeight);
             overlay.draw(canvas);
         }
+        drawToasts(logicalWidth, logicalHeight);
         nvgEndFrame(vg);
         glfwSwapBuffers(handle);
 
@@ -294,6 +432,9 @@ final class Window implements Host {
                     return; // one button at a time
                 }
                 syncCursor(); // a press can arrive before any move event (e.g. right after entering the window)
+                if (dismissToastAt(logical(cursorX), logical(cursorY))) {
+                    return;
+                }
                 updateHover();
                 if (button == GLFW_MOUSE_BUTTON_LEFT) {
                     countClicks();

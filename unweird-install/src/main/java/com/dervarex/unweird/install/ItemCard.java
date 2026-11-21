@@ -4,6 +4,8 @@ import com.dervarex.unweird.Button;
 import com.dervarex.unweird.Component;
 import com.dervarex.unweird.Image;
 import com.dervarex.unweird.Text;
+import com.dervarex.unweird.Toast;
+import com.dervarex.unweird.Unweird;
 import com.dervarex.unweird.annotation.Card;
 import lombok.Getter;
 
@@ -37,11 +39,17 @@ public class ItemCard extends Component {
                 .rightOf(details)
                 .visibleIf(() -> !status().installed())
                 .enabledIf(() -> !status().busy())
-                .onClick(() -> installer.install(item));
+                .onClick(this::install);
         this.remove = new Button("Remove").secondary()
                 .rightOf(details)
                 .visibleIf(() -> status().installed())
                 .onClick(() -> installer.uninstall(item));
+    }
+
+    private void install() {
+        installer.install(item).whenComplete((done, error) -> Unweird.toast(error == null
+                ? Toast.success("Installed " + item.title())
+                : Toast.error("Couldn't install " + item.title() + ": " + installer.status(item).message())));
     }
 
     public Installer.Status status() {

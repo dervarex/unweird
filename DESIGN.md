@@ -269,6 +269,21 @@ A relation to a text that's currently empty (hidden) is ignored until that text 
 - Buttons can have live labels, too: `new Button(() -> dark ? "Light mode" : "Dark mode")`.
 - No CSS files.
 
+## Background work, timers and toasts
+
+```java
+async(() -> api.loadWorlds())                 // runs on a virtual thread
+        .then(worlds -> this.worlds = worlds)   // UI thread, then the UI refreshes
+        .failed(error -> status = error.getMessage());
+toast("Saved");                               // corner message, gone after a few seconds (click to dismiss)
+toast(Toast.error("Couldn't connect"));       // success / info / error
+Unweird.after(Duration.ofSeconds(2), () -> ...);  // timer on the UI thread
+Unweird.later(() -> ...);                     // UI thread, after the current event
+```
+
+Without a `failed` handler, an error becomes an error toast (and is printed), it's never swallowed.
+The event loop sleeps until the next input *or* the next timer, so timers cost nothing while idle.
+
 ## Runtime & threading
 
 - `Unweird.start(...)` takes over the calling thread as the UI thread.
