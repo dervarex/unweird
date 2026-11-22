@@ -59,3 +59,6 @@ Dev machine is NixOS with dwm. GLFW finds the X11/GL libraries there without ext
 ## Git
 
 Commit finished pieces of work on your own with clear messages; push only when asked.
+Add a Co-authored-by line unless the owner tells you to exclude it.
+You may use Branches, Pull Requests, Issues, Releases and all other Features provided trough GitHub CLI.
+Before releasing, always ask the owner and verify the current state.
