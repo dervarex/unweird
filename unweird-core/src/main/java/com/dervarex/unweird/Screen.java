@@ -38,7 +38,7 @@ public abstract class Screen extends Container {
     protected void onShow() {
     }
 
-    /** Called when another screen replaces this one. */
+    /** Called when another screen replaces this one, and when the window closes. */
     protected void onHide() {
     }
 

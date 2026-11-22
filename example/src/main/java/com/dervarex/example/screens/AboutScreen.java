@@ -1,6 +1,8 @@
 package com.dervarex.example.screens;
 
+import com.dervarex.unweird.Button;
 import com.dervarex.unweird.Screen;
+import com.dervarex.unweird.Unweird;
 import com.dervarex.unweird.Text;
 import com.dervarex.unweird.annotation.Title;
 
@@ -25,4 +27,6 @@ public class AboutScreen extends Screen {
     Text font = new Text("Text is set in Noto Sans, licensed under the SIL Open Font License. "
             + "Emoji and symbols fall back to Noto Emoji, Noto Sans Symbols 2 and Noto Sans Math: ✓ ★ → ⚡ 🎉 🧱 ⛏");
     Text end = new Text("You scrolled all the way down. That's the whole story so far.");
+    Button github = new Button("View on GitHub").secondary()
+            .onClick(() -> Unweird.open("https://github.com/dervarex/unweird"));
 }

@@ -41,7 +41,7 @@ Hooks:
 
 ```java
 @Override protected void onShow() { pass.value(""); }   // every time it's shown, also the first
-@Override protected void onHide() { ... }               // when another screen replaces it
+@Override protected void onHide() { ... }               // when another screen replaces it, or the window closes
 ```
 
 ## Components

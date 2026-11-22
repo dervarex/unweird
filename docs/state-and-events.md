@@ -15,6 +15,26 @@ redraws what changed. So you change a field, the UI follows. `@State` does nothi
 
 Changed something from another thread? Call `refresh()` (or `Unweird.refresh()`).
 
+## Things that change outside the UI
+
+Some libraries tell you about changes through a listener, on their own thread. Read their state straight in your
+lambdas, and let the listener only say "redraw":
+
+```java
+private final LoginStateChangeListener redraw = state -> refresh();
+
+{
+    whileShown(() -> AuthManager.addStateChangeListener(redraw),
+               () -> AuthManager.removeStateChangeListener(redraw));
+}
+
+Text status = new Text(() -> AuthManager.getLoginState().message);
+```
+
+`whileShown(onShown, onHidden)` works on screens and components: `onShown` runs when it appears on screen,
+`onHidden` when it goes away (another screen, removed from an `Each`, window closed). Registered while already
+showing, `onShown` runs right away.
+
 ## Background work
 
 ```java
@@ -61,6 +81,17 @@ pass.focus();
 
 Tab and Shift+Tab go through everything in declaration order. The first field on a screen gets focus when the
 screen opens.
+
+## Opening links and files
+
+```java
+Unweird.open("https://example.com");     // default browser
+Unweird.open("mailto:me@example.com");
+Unweird.open(Path.of("logs"));            // folders and files in their default app
+```
+
+Returns false if nothing could be started (no `xdg-open`, say); show the link yourself then. Don't use
+`java.awt.Desktop`: unweird runs AWT headless, so it's not available.
 
 ## Files dropped on the window
 

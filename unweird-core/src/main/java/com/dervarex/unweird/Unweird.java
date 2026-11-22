@@ -2,6 +2,7 @@ package com.dervarex.unweird;
 
 import com.dervarex.unweird.style.Theme;
 
+import java.util.List;
 import java.util.Objects;
 
 /** Entry point: {@code Unweird.start(LoginScreen.class);} */
@@ -46,6 +47,7 @@ public final class Unweird {
             navigate(firstScreen);
             created.run();
         } finally {
+            leave(current, List.of()); // the window is closing: run onHide and whileShown hooks for cleanup
             window = null;
             screens = null;
             current = null;
@@ -198,12 +200,93 @@ public final class Unweird {
     private static void navigate(Class<? extends Screen> type) {
         Screen next = screens.get(type);
         Screen previous = current;
-        if (previous != null && previous != next) {
-            window.safely(previous, previous::onHide);
+        List<DockSlot> nextDocks = Defaults.forScreen(type);
+        if (previous != next) {
+            leave(previous, nextDocks);
         }
-        next.docks = Defaults.forScreen(type);
+        next.docks = nextDocks;
         current = next;
         window.show(next);
+        next.attach();
+        for (DockSlot slot : nextDocks) {
+            slot.component.attach(); // no-op for docks that were already showing
+        }
         window.safely(next, next::onShow);
+    }
+
+    /** {@code screen} goes away: onHide, then its whileShown hooks, and those of docks that won't stay. */
+    private static void leave(Screen screen, List<DockSlot> stayingDocks) {
+        if (screen == null) {
+            return;
+        }
+        runSafely(screen, screen::onHide);
+        screen.detach();
+        for (DockSlot slot : screen.docks) {
+            if (stayingDocks.stream().noneMatch(staying -> staying.component == slot.component)) {
+                slot.component.detach();
+            }
+        }
+    }
+
+    /** Runs user code; an exception is reported instead of taking the app down. */
+    static void runSafely(Widget source, Runnable code) {
+        Window current = window;
+        if (current != null) {
+            current.safely(source, code);
+            return;
+        }
+        try {
+            code.run();
+        } catch (RuntimeException e) {
+            System.err.println("unweird: a handler on " + (source == null ? "?" : source.getClass().getSimpleName()) + " threw:");
+            e.printStackTrace();
+        }
+    }
+
+    // ---- opening links and files ----
+
+    /**
+     * Opens a link or file in the user's default app: {@code Unweird.open("https://example.com")}, also
+     * {@code mailto:} links and file paths. Works without AWT's {@code Desktop} (unweird runs AWT headless).
+     * Safe from any thread.
+     *
+     * @return false if no opener could be started (e.g. {@code xdg-open} is missing); show the link yourself then
+     */
+    public static boolean open(String target) {
+        try {
+            new ProcessBuilder(openCommand(System.getProperty("os.name", ""), target))
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            return true;
+        } catch (java.io.IOException e) {
+            System.err.println("unweird: couldn't open " + target + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** Opens a file (or folder) in the user's default app. See {@link #open(String)}. */
+    public static boolean open(java.nio.file.Path file) {
+        return open(file.toAbsolutePath().toString());
+    }
+
+    /** The command that opens {@code target} on this OS. */
+    static List<String> openCommand(String osName, String target) {
+        Objects.requireNonNull(target, "target");
+        String trimmed = target.strip();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Nothing to open");
+        }
+        if (trimmed.startsWith("-")) {
+            throw new IllegalArgumentException("Refusing to open \"" + trimmed + "\": it would be read as an option");
+        }
+        String os = osName.toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("win")) {
+            return List.of("rundll32", "url.dll,FileProtocolHandler", trimmed);
+        }
+        if (os.contains("mac")) {
+            return List.of("open", trimmed);
+        }
+        return List.of("xdg-open", trimmed);
     }
 }

@@ -18,6 +18,13 @@ public abstract class Container extends Widget {
 
     private List<Widget> manual;
     private List<Widget> children;
+    /** Children as last resolved, to tell which ones came and went. */
+    private List<Widget> previousChildren = List.of();
+
+    /** {@link #whileShown} hooks as {shown, hidden} pairs. */
+    private final List<Runnable[]> lifecycle = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** On screen right now: part of the shown screen, or a dock that's showing. */
+    private boolean attached;
     /** Set while this container is docked on a screen edge; switches to {@link Docking}'s layout. */
     Docking.Axis dockAxis;
     /** How the surrounding content is laid out; set by {@link Flow} before measuring. */
@@ -134,8 +141,89 @@ public abstract class Container extends Widget {
                 child.parent = this;
             }
             children = Collections.unmodifiableList(resolved);
+            if (attached) {
+                attachChanges(previousChildren, children);
+            }
+            previousChildren = children;
         }
         return children;
+    }
+
+    // ---- on screen or not ----
+
+    /**
+     * Runs {@code onShown} whenever this screen or component appears on screen and {@code onHidden} when it goes away
+     * (another screen is shown, it's removed from an {@link Each}, the window closes). For listeners on things outside
+     * the UI:
+     *
+     * <pre>{@code
+     * private final LoginStateChangeListener redraw = state -> refresh();
+     * { whileShown(() -> AuthManager.addStateChangeListener(redraw), () -> AuthManager.removeStateChangeListener(redraw)); }
+     * }</pre>
+     *
+     * If it's already on screen, {@code onShown} runs right away. Runs on the UI thread.
+     */
+    protected final void whileShown(Runnable onShown, Runnable onHidden) {
+        Runnable[] hooks = {java.util.Objects.requireNonNull(onShown, "onShown"), java.util.Objects.requireNonNull(onHidden, "onHidden")};
+        lifecycle.add(hooks);
+        if (attached) {
+            Unweird.runSafely(this, onShown);
+        }
+    }
+
+    /** It's on screen now: run shown hooks, here first, then for every container inside. */
+    final void attach() {
+        if (attached) {
+            return;
+        }
+        attached = true;
+        for (Runnable[] hooks : lifecycle) {
+            Unweird.runSafely(this, hooks[0]);
+        }
+        for (Widget child : children()) {
+            if (child instanceof Container container) {
+                container.attach();
+            }
+        }
+    }
+
+    /** It's gone from the screen: hidden hooks, inner containers first, in reverse order. */
+    final void detach() {
+        if (!attached) {
+            return;
+        }
+        for (Widget child : children()) {
+            if (child instanceof Container container) {
+                container.detach();
+            }
+        }
+        attached = false;
+        List<Runnable[]> hooks = new ArrayList<>(lifecycle);
+        java.util.Collections.reverse(hooks);
+        for (Runnable[] pair : hooks) {
+            Unweird.runSafely(this, pair[1]);
+        }
+    }
+
+    final boolean isAttached() {
+        return attached;
+    }
+
+    private static void attachChanges(List<Widget> before, List<Widget> after) {
+        Set<Widget> now = Collections.newSetFromMap(new IdentityHashMap<>());
+        now.addAll(after);
+        Set<Widget> was = Collections.newSetFromMap(new IdentityHashMap<>());
+        was.addAll(before);
+        for (Widget old : before) {
+            if (!now.contains(old) && old instanceof Container container) {
+                container.detach();
+            }
+        }
+        for (Widget fresh : after) {
+            if (!was.contains(fresh) && fresh instanceof Container container) {
+                container.attach();
+            }
+        }
     }
 
     @Override

@@ -207,7 +207,10 @@ and a block-world editor (`VoxelWorld`: place with click, remove with right-clic
   From other code, `Unweird.go(...)` does the same. Calls from other threads are handed to the UI thread.
 - **Lifecycle:** each screen class is created once and cached, so typed input survives navigating away and back.
   A screen annotated `@Fresh` is rebuilt on every `go(...)`.
-- Hooks: `onShow()` runs on every visit (also the first), `onHide()` when another screen replaces it.
+- Hooks: `onShow()` runs on every visit (also the first), `onHide()` when another screen replaces it or the window closes.
+  `whileShown(onShown, onHidden)` does the same for screens *and* components (also docked ones and `Each` rows):
+  for subscribing to listeners outside the UI.
+- `Unweird.open(link or path)` opens things in the default app (AWT `Desktop` isn't available: AWT runs headless).
   Example: the login screen clears its password field in `onShow()`.
 - **Sharing data between screens:** keep it on a `@Default` component and reach it with `shared(...)`,
   e.g. `shared(Header.class).setUser(name)` on login, and the header shows it.
