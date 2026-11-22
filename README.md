@@ -48,22 +48,16 @@ card, in the order you declared them.
 
 ## Getting started
 
-unweird is on [JitPack](https://jitpack.io/#dervarex/unweird).
+unweird is on [JitPack](https://jitpack.io/#dervarex/unweird). Add the JitPack repository and the dependencies:
 
-`settings.gradle.kts` (or `repositories` in `build.gradle.kts`):
+**Kotlin DSL** (`build.gradle.kts`):
 
 ```kotlin
-dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
+repositories {
+    mavenCentral()
+    maven("https://jitpack.io")
 }
-```
 
-`build.gradle.kts`:
-
-```kotlin
 dependencies {
     implementation("com.github.dervarex.unweird:unweird-core:v0.1.0")
     // the annotation processor records the order of your widget fields
@@ -76,8 +70,28 @@ dependencies {
 }
 ```
 
+**Groovy DSL** (`build.gradle`):
+
+```groovy
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.dervarex.unweird:unweird-core:v0.1.0'
+    // the annotation processor records the order of your widget fields
+    annotationProcessor 'com.github.dervarex.unweird:unweird-processor:v0.1.0'
+
+    // optional
+    implementation 'com.github.dervarex.unweird:unweird-components:v0.1.0'
+    implementation 'com.github.dervarex.unweird:unweird-install:v0.1.0'
+    implementation 'com.github.dervarex.unweird:unweird-3d:v0.1.0'
+}
+```
+
 Working on unweird itself at the same time? Clone it next to your project and add `includeBuild("../unweird")`
-to `settings.gradle.kts`; Gradle then uses your local copy.
+to your settings file; Gradle then uses your local copy.
 
 Then start your first screen:
 

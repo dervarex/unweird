@@ -57,3 +57,11 @@ configure(subprojects.filter { it.name != "example" }) {
         }
     }
 }
+
+// Gradle module metadata can't express the LWJGL "natives-linux" classifier dependencies and silently drops them,
+// so consumers would compile fine and then crash at startup. Publish only the POM, which keeps them.
+subprojects {
+    tasks.withType<GenerateModuleMetadata>().configureEach {
+        enabled = false
+    }
+}
