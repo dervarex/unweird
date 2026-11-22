@@ -146,7 +146,7 @@ View3D view = new View3D(new Scene().add(new Node(Mesh.box(1, 1, 1), Material.co
         .onClick((hit, button) -> ...);
 ```
 
-More in [DESIGN.md](DESIGN.md), which describes how everything works.
+More in the [documentation](docs/README.md). Design notes and the roadmap are in [DESIGN.md](DESIGN.md).
 
 ## Running the demo
 
