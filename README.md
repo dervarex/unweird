@@ -185,3 +185,8 @@ a 3D skin viewer (load your own skin by username) and a small block-world editor
 
 Text is set in Noto Sans, with Noto Sans Symbols 2, Noto Sans Math and Noto Emoji as fallbacks
 (all SIL Open Font License). Rendering by [LWJGL](https://www.lwjgl.org/) and NanoVG.
+
+## License
+
+unweird is licensed under the [Apache License 2.0](LICENSE). The bundled fonts keep their own licenses
+(SIL Open Font License), included next to them.
