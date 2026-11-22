@@ -90,6 +90,8 @@ final class Window implements Host {
     private float windowToLogical = 1;
 
     private final App app;
+    private volatile int lastErrorCode;
+    private volatile String lastError = "no details";
     private final Path boundsFile;
     /** Last position/size while not maximized, so a maximized window still remembers its normal bounds. */
     private int normalX;
@@ -102,9 +104,18 @@ final class Window implements Host {
         this.app = app;
         this.boundsFile = app.remember ? WindowBounds.file(app.name) : null;
 
-        GLFWErrorCallback.createPrint(System.err).set();
+        // remember GLFW's last error, so failures can be explained instead of just reported
+        glfwSetErrorCallback((code, description) -> {
+            lastErrorCode = code;
+            lastError = GLFWErrorCallback.getDescription(description);
+            System.err.println("unweird: GLFW: " + lastError);
+        });
         if (!glfwInit()) {
-            throw new IllegalStateException("unweird: could not initialise GLFW. Is a display available?");
+            GLFWErrorCallback callback = glfwSetErrorCallback(null);
+            if (callback != null) {
+                callback.free();
+            }
+            throw new IllegalStateException(explainFailure(lastErrorCode, lastError, false));
         }
 
         glfwDefaultWindowHints();
@@ -122,8 +133,13 @@ final class Window implements Host {
         int height = saved != null ? saved.height() : app.height;
         handle = glfwCreateWindow(width, height, app.name, NULL, NULL);
         if (handle == NULL) {
+            String message = explainFailure(lastErrorCode, lastError, true);
             glfwTerminate();
-            throw new IllegalStateException("unweird: could not create a window (OpenGL 3.3 is required)");
+            GLFWErrorCallback callback = glfwSetErrorCallback(null);
+            if (callback != null) {
+                callback.free();
+            }
+            throw new IllegalStateException(message);
         }
         if (app.minWidth > 0 || app.minHeight > 0) {
             glfwSetWindowSizeLimits(handle, app.minWidth > 0 ? app.minWidth : GLFW_DONT_CARE,
@@ -977,6 +993,28 @@ final class Window implements Host {
                     : "unweird: a handler on " + source.getClass().getSimpleName() + " threw:");
             e.printStackTrace();
         }
+    }
+
+    /** Turns GLFW's last error into a message that says what's wrong and what to do. */
+    static String explainFailure(int code, String description, boolean creatingWindow) {
+        String details = " (GLFW: " + description + ")";
+        if (!creatingWindow) {
+            return "unweird: there's no display to open a window on" + details
+                    + ". Is DISPLAY (X11) or WAYLAND_DISPLAY set? Over SSH or in a container there may be none.";
+        }
+        String lower = description.toLowerCase(java.util.Locale.ROOT);
+        boolean noLibrary = code == GLFW_API_UNAVAILABLE || lower.contains("failed to load") || lower.contains("glx") && lower.contains("load");
+        if (noLibrary) {
+            return "unweird: couldn't load OpenGL" + details + ". The graphics driver's libGL wasn't found. "
+                    + "On NixOS this happens with a JDK from the Nix store: use a regular JDK (it runs through nix-ld), "
+                    + "start with LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib (if nix-ld is enabled), "
+                    + "or use a dev shell that provides libGL.";
+        }
+        if (code == GLFW_VERSION_UNAVAILABLE) {
+            return "unweird: the graphics driver doesn't offer OpenGL 3.3" + details
+                    + ". Update the driver; in a virtual machine, turn on 3D acceleration.";
+        }
+        return "unweird: couldn't create a window" + details;
     }
 
     private void rememberNormalBounds() {

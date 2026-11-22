@@ -54,7 +54,9 @@ Lombok for getters, never hand-written. Error messages say what to do.
 
 ## Environment
 
-Dev machine is NixOS with dwm. GLFW finds the X11/GL libraries there without extra setup.
+Dev machine is NixOS with dwm. GLFW finds the X11/GL libraries through nix-ld when the JDK is a regular one
+(Temurin, downloaded by Gradle/IntelliJ). A JDK from the Nix store can't load `libGL` ("couldn't load OpenGL");
+`LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib` fixes that, `/run/opengl-driver/lib` alone doesn't.
 
 ## Git
 

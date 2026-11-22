@@ -65,3 +65,40 @@ subprojects {
         enabled = false
     }
 }
+
+// The sources jar must match the bytecode: modules using Lombok publish "delomboked" sources (with the generated
+// getters written out), otherwise IDEs report "library source does not match the bytecode".
+configure(subprojects.filter { it.name != "example" }) {
+    afterEvaluate {
+        val compileClasspath = configurations.getByName("compileClasspath")
+        if (compileClasspath.allDependencies.none { it.group == "org.projectlombok" }) {
+            return@afterEvaluate
+        }
+        val sources = extensions.getByType<SourceSetContainer>()["main"].java
+        val delombok = tasks.register<JavaExec>("delombok") {
+            val output = layout.buildDirectory.dir("delombok")
+            inputs.files(sources.srcDirs)
+            inputs.files(compileClasspath)
+            outputs.dir(output)
+            classpath = compileClasspath
+            mainClass = "lombok.launch.Main"
+            argumentProviders.add(CommandLineArgumentProvider {
+                listOf("delombok", "--quiet", "--encoding=UTF-8",
+                        "--classpath=" + compileClasspath.asPath,
+                        "-d", output.get().asFile.absolutePath) +
+                        sources.srcDirs.filter { it.exists() }.map { it.absolutePath }
+            })
+            doFirst { output.get().asFile.deleteRecursively() }
+        }
+        val originals = sources.srcDirs.map { it.toPath() }
+        tasks.named<Jar>("sourcesJar") {
+            from(delombok)
+            // drop the sources as written; their delomboked versions take their place
+            eachFile {
+                if (originals.any { file.toPath().startsWith(it) }) {
+                    exclude()
+                }
+            }
+        }
+    }
+}

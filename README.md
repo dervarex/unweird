@@ -196,8 +196,10 @@ a 3D skin viewer (load your own skin by username) and a small block-world editor
 
 - **"no field order recorded for ..."** — add the annotation processor (see *Getting started*), or list the widgets
   yourself with `add(...)`.
-- **The window doesn't open on NixOS** — GLFW needs the X11/Wayland and OpenGL libraries on the library path,
-  e.g. via `nix-ld` or a dev shell that provides them.
+- **"couldn't load OpenGL" on NixOS** — the JDK comes from the Nix store, so it doesn't see the system's `libGL`.
+  Use a regular JDK (e.g. one Gradle or IntelliJ downloads; it runs through `nix-ld`), or start with
+  `LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib` (needs `programs.nix-ld.enable`), or use a dev shell
+  that provides libGL. `/run/opengl-driver/lib` alone isn't enough: it lacks `libGL.so.1`.
 
 ## Credits
 

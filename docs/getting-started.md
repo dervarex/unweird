@@ -53,6 +53,9 @@ Java can't tell that order at runtime. The processor writes it down at compile t
 
 You need Java 21+ and OpenGL 3.3. Linux works; Windows and macOS aren't done yet.
 
+On NixOS, run with a regular JDK (one Gradle or IntelliJ downloads), not one from the Nix store: Nix-built JDKs
+can't see the system's `libGL`, and you get "couldn't load OpenGL". The error message lists the alternatives.
+
 ## First window
 
 ```java
