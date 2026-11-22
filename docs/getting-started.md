@@ -2,26 +2,36 @@
 
 ## Add it to your build
 
-unweird isn't on Maven yet, so pull it in as a composite build. Clone it next to your project:
+unweird is on [JitPack](https://jitpack.io/#dervarex/unweird).
 
-```bash
-git clone https://github.com/dervarex/unweird.git
-```
-
-`settings.gradle.kts`:
+`settings.gradle.kts` (or `repositories` in `build.gradle.kts`):
 
 ```kotlin
-includeBuild("../unweird")
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
 ```
 
 `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.dervarex:unweird-core:0.1.0-SNAPSHOT")
-    annotationProcessor("com.dervarex:unweird-processor:0.1.0-SNAPSHOT")
+    implementation("com.github.dervarex.unweird:unweird-core:v0.1.0")
+    // the annotation processor records the order of your widget fields
+    annotationProcessor("com.github.dervarex.unweird:unweird-processor:v0.1.0")
+
+    // optional
+    implementation("com.github.dervarex.unweird:unweird-components:v0.1.0")
+    implementation("com.github.dervarex.unweird:unweird-install:v0.1.0")
+    implementation("com.github.dervarex.unweird:unweird-3d:v0.1.0")
 }
 ```
+
+Working on unweird itself at the same time? Clone it next to your project and add `includeBuild("../unweird")`
+to `settings.gradle.kts`; Gradle then uses your local copy.
 
 Don't skip the annotation processor. unweird adds your widget fields to the screen in the order you wrote them, and
 Java can't tell that order at runtime. The processor writes it down at compile time. Without it you get

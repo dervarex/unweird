@@ -48,32 +48,36 @@ card, in the order you declared them.
 
 ## Getting started
 
-unweird isn't published to a Maven repository yet. Use it from source with a Gradle composite build:
+unweird is on [JitPack](https://jitpack.io/#dervarex/unweird).
 
-```bash
-git clone https://github.com/dervarex/unweird.git
-```
-
-In your project's `settings.gradle.kts`:
+`settings.gradle.kts` (or `repositories` in `build.gradle.kts`):
 
 ```kotlin
-includeBuild("../unweird")
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
 ```
 
-In your `build.gradle.kts`:
+`build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.dervarex:unweird-core:0.1.0-SNAPSHOT")
+    implementation("com.github.dervarex.unweird:unweird-core:v0.1.0")
     // the annotation processor records the order of your widget fields
-    annotationProcessor("com.dervarex:unweird-processor:0.1.0-SNAPSHOT")
+    annotationProcessor("com.github.dervarex.unweird:unweird-processor:v0.1.0")
 
     // optional
-    implementation("com.dervarex:unweird-components:0.1.0-SNAPSHOT")
-    implementation("com.dervarex:unweird-install:0.1.0-SNAPSHOT")
-    implementation("com.dervarex:unweird-3d:0.1.0-SNAPSHOT")
+    implementation("com.github.dervarex.unweird:unweird-components:v0.1.0")
+    implementation("com.github.dervarex.unweird:unweird-install:v0.1.0")
+    implementation("com.github.dervarex.unweird:unweird-3d:v0.1.0")
 }
 ```
+
+Working on unweird itself at the same time? Clone it next to your project and add `includeBuild("../unweird")`
+to `settings.gradle.kts`; Gradle then uses your local copy.
 
 Then start your first screen:
 
