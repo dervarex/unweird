@@ -51,7 +51,7 @@ card, in the order you declared them.
 unweird isn't published to a Maven repository yet. Use it from source with a Gradle composite build:
 
 ```bash
-git clone <this repository> unweird
+git clone https://github.com/dervarex/unweird.git
 ```
 
 In your project's `settings.gradle.kts`:
