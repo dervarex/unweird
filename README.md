@@ -1,9 +1,9 @@
 > [!IMPORTANT]
 > **The development of unweird was heavily assisted by Claude (Anthropic's AI).**
-> Claude wrote most of the code. The decisions — what the library should do, how it should work and how its API
-> should feel — were made by me.
+> Claude wrote most of the code. Decisions like what the library should do how it should work and how its API
+> should look like, were made by me though, since the API is shaped around how I want frontend development to be (as a backend dev lol).
 >
-> Why build it at all? No existing Java UI library fit my use case:
+> Why even do that stuff? No existing Java UI library fit my use case:
 > **Swing (+ FlatLaf)** is too old, **JavaFX** is too bloated, and **Compose Desktop** isn't available for Java
 > (it needs Kotlin).
 
