@@ -13,14 +13,14 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.dervarex.unweird:unweird-core:v0.1.0")
+    implementation("com.github.dervarex.unweird:unweird-core:v0.1.1")
     // the annotation processor records the order of your widget fields
-    annotationProcessor("com.github.dervarex.unweird:unweird-processor:v0.1.0")
+    annotationProcessor("com.github.dervarex.unweird:unweird-processor:v0.1.1")
 
     // optional
-    implementation("com.github.dervarex.unweird:unweird-components:v0.1.0")
-    implementation("com.github.dervarex.unweird:unweird-install:v0.1.0")
-    implementation("com.github.dervarex.unweird:unweird-3d:v0.1.0")
+    implementation("com.github.dervarex.unweird:unweird-components:v0.1.1")
+    implementation("com.github.dervarex.unweird:unweird-install:v0.1.1")
+    implementation("com.github.dervarex.unweird:unweird-3d:v0.1.1")
 }
 ```
 
@@ -33,14 +33,14 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.dervarex.unweird:unweird-core:v0.1.0'
+    implementation 'com.github.dervarex.unweird:unweird-core:v0.1.1'
     // the annotation processor records the order of your widget fields
-    annotationProcessor 'com.github.dervarex.unweird:unweird-processor:v0.1.0'
+    annotationProcessor 'com.github.dervarex.unweird:unweird-processor:v0.1.1'
 
     // optional
-    implementation 'com.github.dervarex.unweird:unweird-components:v0.1.0'
-    implementation 'com.github.dervarex.unweird:unweird-install:v0.1.0'
-    implementation 'com.github.dervarex.unweird:unweird-3d:v0.1.0'
+    implementation 'com.github.dervarex.unweird:unweird-components:v0.1.1'
+    implementation 'com.github.dervarex.unweird:unweird-install:v0.1.1'
+    implementation 'com.github.dervarex.unweird:unweird-3d:v0.1.1'
 }
 ```
 

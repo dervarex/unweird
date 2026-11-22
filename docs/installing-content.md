@@ -4,7 +4,7 @@ For apps that let people browse a catalog and install things into a folder: mods
 It doesn't know any catalog. You plug one in.
 
 ```kotlin
-implementation("com.github.dervarex.unweird:unweird-install:v0.1.0")
+implementation("com.github.dervarex.unweird:unweird-install:v0.1.1")
 ```
 
 ## Plug in a source
