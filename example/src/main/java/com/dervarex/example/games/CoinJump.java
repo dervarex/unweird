@@ -60,8 +60,8 @@ public class CoinJump extends Game {
         Coin top       = new Coin().from(19, 7).to(23, 7);
         Slime one      = new Slime().at(30, 1);
         Slime two      = new Slime().at(42, 1);
-        Spike pit      = new Spike().from(50, 1).to(53, 1);
-        Plank bridge   = new Plank().from(50, 4).to(53, 4);
+        Spike pit      = new Spike().from(50, 1).to(52, 1);
+        Plank bridge   = new Plank().from(50, 4).to(52, 4);
         Coin bonus     = new Coin().from(60, 1).to(66, 1);
         Flag flag      = new Flag().at(78, 1);
     }
