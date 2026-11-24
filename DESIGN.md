@@ -20,6 +20,8 @@ no string IDs, no layout boilerplate, no `bind().map()` chains.
 | `unweird-core` | App runtime, renderer, layout engine, base widgets (Text, Button, Field, …), annotations |
 | `unweird-processor` | Compile-time annotation processor (field order + `@Default` index) |
 | `unweird-components` | Ready-made composites (login form, settings panel, …) |
+| `unweird-3d` | 3D views: scene graph, meshes, textures, cameras, picking |
+| `unweird-game` | Games: 2D (sprites, levels) and 3D (block worlds, terrain, explorer), sound |
 | `unweird-anim` | Animations & transitions (v2) |
 | `example` | The login/home demo app |
 
@@ -194,6 +196,38 @@ View3D view = new View3D(scene)
 The example app has a skin viewer (`SkinModel` ~80 lines, `SkinLoader` ~150: load by Minecraft username via Mojang's API
 with slim-arm detection, by URL, by file path or by dropping a PNG; legacy 64×32 skins converted; spin toggle and turn slider)
 and a block-world editor (`VoxelWorld`: place with click, remove with right-click).
+
+## Games (`unweird-game`)
+
+Goal: making a game is as short as making a screen, for 2D and 3D. User docs: `docs/games.md`.
+
+- **A game is a `Screen`** (`Game`, `Game3D`): `Unweird.start(...)`, `go(...)`, widget fields as a HUD
+  (`Screen.overlay()` lays them along the top). `GameView` puts one inside another screen; the frame logic draws into
+  any area and the mouse capture belongs to whoever shows it (`Game3D.Host`).
+- **Behavior from the base class, not from code.** `Player`, `Wall`, `Platform`, `Pickup`, `Hazard`, `Goal`,
+  `Enemy`, `Shot`; `Block` (+ `@SeeThrough`, `@Liquid`, `@Plant`, `@Unbreakable`), `Explorer`, `Creature`, `Thing`.
+  Tuning is annotations (`@Speed`, `@Jump`, `@Shoots`, `@TopDown`, `@Resolution`, `@Sky`, `@ViewDistance`, `@Seed`,
+  `@Saved`, `@DayLength`) or short calls on parts (`new Hills().height(50)`, `new Trees(log, leaves).dense()`).
+- **Hooks by name** (`tick`, `touch(Coin c)`, `picked`, `hurt`, `clicked`, `started`, `won`, …) are found by
+  reflection (`Hooks`), so beginners write `void picked()` without `protected`/`@Override` (an override of a
+  protected method with package access wouldn't compile). The most specific `touch(T)` wins; exceptions are printed
+  and the game goes on.
+- **No strings**: pictures, models and sounds are found by class or field name (`CoinBox` → `coin_box.png`,
+  `Sound explosion` → `explosion.ogg`). Missing art gets placeholders that fit the kind and words in the name;
+  missing sounds fall back to synthesized effects. A game runs with zero assets.
+- **Things are inner classes**, so they see the game's fields (`coins++`). Copies (`from(..).to(..)`) are clones;
+  levels are recreated through their inner-class constructor on every restart.
+- **2D**: positions in tiles on a fixed world grid, y up. `World` (no GL, unit-tested) steps physics at ≤ 1/120 s:
+  axis-separated AABB movement against a cell index of walls, one-way platforms, touch events once per contact.
+  Drawn by `Batch` (GL 3.3 sprite batch, nearest filtering, whole-number scaling of the `@Resolution`).
+- **3D**: 16 × 128 × 16 chunks generated and meshed on a small thread pool around the explorer, dropped far away;
+  edits are kept apart so regenerated chunks keep them (and `@Saved` writes them). `Terrain` = ordered `Part`s with
+  `height` / `block` / `decorate` steps and seeded Perlin noise; decoration covers a margin around the chunk so trees
+  cross chunk borders. `Mesher`: face culling, per-vertex ambient occlusion, separate solid / cutout / liquid
+  meshes, one texture atlas. Rendered by `unweird-3d` (`Renderer` is public for this; first-person `Camera`, fog,
+  frustum culling); HUD with the same `Batch`.
+- **Core support** it needed: `Keyboard.held/pressed`, `Widget.lockPointer()`, `@Without` for all docks,
+  `Screen.title()` and `Screen.overlay()`.
 
 ## Screens
 
@@ -404,6 +438,8 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
 | **M7** ✅ | Foundations: custom-widget input API (`Slider` built on it), window options (`Unweird.app(...)`), dialogs, toasts, `async`, timers, `@Shortcut`/`focus()`, tooltips, `maxLines`, field undo, fallback fonts |
 | **3D** ✅ | `unweird-3d` (branch `3d-rendering`): `View3D` in normal layouts, scene graph, meshes/box UV, textures, materials, orbit camera, picking; `Canvas.gl` + `requestFrame` in core; skin viewer and world editor demos |
+| **Games** ✅ | `unweird-game` (branch `game-module`): 2D games (kinds, levels, placeholders, sounds, `@TopDown`), 3D block worlds (terrain parts, chunks, explorer, creatures, `@Saved`), `GameView`; demos Coin Jump and Wilds |
+| next | Games: health and inventories, falling and flowing blocks, moving platforms, gamepads |
 
 ## Open points
 

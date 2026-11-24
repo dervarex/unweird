@@ -73,6 +73,9 @@ final class Defaults {
     static List<DockSlot> forScreen(Class<? extends Screen> screenType) {
         Set<Class<?>> excluded = new HashSet<>();
         Without without = screenType.getAnnotation(Without.class);
+        if (without != null && without.value().length == 0) {
+            return List.of(); // @Without alone: none of them
+        }
         if (without != null) {
             for (Class<?> type : without.value()) {
                 if (!types().contains(type)) {

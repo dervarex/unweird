@@ -12,5 +12,6 @@ Read them in order the first time, after that jump around.
 8. [Your own widgets](custom-widgets.md) — drawing, input, raw OpenGL
 9. [Installing content](installing-content.md) — `unweird-install`
 10. [3D](3d.md) — `unweird-3d`
+11. [Games](games.md) — `unweird-game`: 2D and 3D games from a few classes
 
 The demo app in `example/` uses almost everything here. If something is unclear, look at how it does it.

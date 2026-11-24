@@ -6,5 +6,6 @@ include(
     "unweird-components",
     "unweird-install",
     "unweird-3d",
+    "unweird-game",
     "example",
 )

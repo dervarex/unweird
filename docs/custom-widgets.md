@@ -52,6 +52,10 @@ You don't redraw yourself. After every event unweird calls `draw` again.
 
 `click()` runs on a left click (press and release on the widget).
 
+For a first-person camera, `lockPointer()` captures the mouse: the cursor disappears and every movement arrives at
+`onMove` as `dx`/`dy`, every button at `onPress`/`onRelease`, wherever the mouse is. Escape, switching windows or
+screens gives it back; `unlockPointer()` and `pointerLocked()` do it from code.
+
 `Slider` in core is written only with these hooks, read it if you want a full example.
 
 ## Animation

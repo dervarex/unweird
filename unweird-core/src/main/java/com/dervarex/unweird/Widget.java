@@ -253,6 +253,28 @@ public abstract class Widget {
         Unweird.requestFrame();
     }
 
+    /** Set by the window while this widget holds the mouse, see {@link #lockPointer()}. */
+    boolean pointerLocked;
+
+    /**
+     * Captures the mouse, for first-person cameras: the cursor disappears and every mouse movement arrives at
+     * {@link #onMove} as {@code dx}/{@code dy}, every button at {@link #onPress}/{@link #onRelease}, wherever the mouse
+     * is. Escape, switching windows or screens gives it back. UI thread only.
+     */
+    protected final void lockPointer() {
+        Unweird.lockPointer(this, true);
+    }
+
+    /** Gives the mouse back after {@link #lockPointer()}. */
+    protected final void unlockPointer() {
+        Unweird.lockPointer(this, false);
+    }
+
+    /** Whether this widget holds the mouse right now. */
+    protected final boolean pointerLocked() {
+        return pointerLocked;
+    }
+
     /**
      * Moves keyboard focus here (if this widget can take it and is on screen). Safe from any thread;
      * e.g. in {@code onShow()} to put the cursor into a particular field.

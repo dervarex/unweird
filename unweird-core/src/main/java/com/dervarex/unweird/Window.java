@@ -65,6 +65,16 @@ final class Window implements Host {
     private Widget hovered;
     private Widget pressed;
     private Widget focused;
+    /** The widget that captured the mouse ({@link Widget#lockPointer()}): cursor hidden, all mouse input goes to it. */
+    private Widget pointerLock;
+    private double lockX;
+    private double lockY;
+    /** Keys held down right now (layout-mapped GLFW codes), for {@link Keyboard}. UI thread only. */
+    final java.util.Set<Integer> heldKeys = new java.util.HashSet<>();
+    /** Mouse buttons held down right now (GLFW buttons). UI thread only. */
+    final java.util.Set<Integer> heldButtons = new java.util.HashSet<>();
+    /** Keys that went down since the last frame, for {@link Keyboard#pressed}. UI thread only. */
+    final java.util.Set<Integer> pressedKeys = new java.util.HashSet<>();
     /** Open overlays, bottom to top. The top one gets input. */
     private final List<Overlay> overlays = new java.util.ArrayList<>();
     private int pressedButton = -1;
@@ -202,6 +212,9 @@ final class Window implements Host {
     }
 
     void show(Screen next) {
+        if (pointerLock != null) {
+            unlockPointer(pointerLock);
+        }
         if (hovered != null) {
             hovered.hovered = false;
             hovered = null;
@@ -215,10 +228,11 @@ final class Window implements Host {
         }
         focus(null, false);
         screen = next;
-        Title title = next.getClass().getAnnotation(Title.class);
+        Title annotation = next.getClass().getAnnotation(Title.class);
+        String title = annotation != null ? annotation.value() : next.title();
         glfwSetWindowTitle(handle, title == null ? app.name
-                : app.name.equals(Unweird.DEFAULT_NAME) || title.value().equals(app.name) ? title.value()
-                : title.value() + " — " + app.name);
+                : app.name.equals(Unweird.DEFAULT_NAME) || title.equals(app.name) ? title
+                : title + " — " + app.name);
 
         // Put the cursor in the first text field, so a login form can be typed into right away.
         for (Widget widget : next.focusables()) {
@@ -505,6 +519,7 @@ final class Window implements Host {
         drawTooltip(logicalWidth, logicalHeight);
         nvgEndFrame(vg);
         canvas.collectSurfaces();
+        pressedKeys.clear();
         glfwSwapBuffers(handle);
 
         if (focused != null && !focused.interactive()) {
@@ -515,6 +530,16 @@ final class Window implements Host {
 
     private void installCallbacks() {
         glfwSetCursorPosCallback(handle, (window, x, y) -> {
+            if (pointerLock != null) {
+                Widget locked = pointerLock;
+                float dx = (float) (x - lockX) * windowToLogical;
+                float dy = (float) (y - lockY) * windowToLogical;
+                lockX = x;
+                lockY = y;
+                safely(locked, () -> locked.pointerMove(pointer(Pointer.Button.NONE, 0, dx, dy)));
+                dirty.set(true);
+                return;
+            }
             cursorX = x;
             cursorY = y;
             if (pressed != null) {
@@ -547,6 +572,21 @@ final class Window implements Host {
             updateHover();
         });
         glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+            if (action == GLFW_PRESS) {
+                heldButtons.add(button);
+            } else {
+                heldButtons.remove(button);
+            }
+            if (pointerLock != null) {
+                Widget locked = pointerLock;
+                if (action == GLFW_PRESS) {
+                    safely(locked, () -> locked.pointerDown(pointer(buttonOf(button), 1, 0, 0)));
+                } else if (action == GLFW_RELEASE) {
+                    safely(locked, () -> locked.pointerUp(pointer(buttonOf(button), 0, 0, 0)));
+                }
+                dirty.set(true);
+                return;
+            }
             if (action == GLFW_PRESS) {
                 if (pressed != null) {
                     return; // one button at a time
@@ -597,12 +637,24 @@ final class Window implements Host {
             }
         });
         glfwSetKeyCallback(handle, (window, key, scancode, action, mods) -> {
+            int code = layoutKey(key, scancode);
             if (action == GLFW_RELEASE) {
+                heldKeys.remove(code);
+                heldKeys.remove(key);
+                dirty.set(true);
+                return;
+            }
+            heldKeys.add(code);
+            if (action == GLFW_PRESS) {
+                pressedKeys.add(code);
+            }
+            if (code == GLFW_KEY_ESCAPE && pointerLock != null) {
+                unlockPointer(pointerLock); // Escape always gives the mouse back
+                dirty.set(true);
                 return;
             }
             resetBlink();
             hideTooltip();
-            int code = layoutKey(key, scancode);
             Overlay top = topOverlay();
             if (code == GLFW_KEY_TAB) {
                 moveFocus((mods & GLFW_MOD_SHIFT) != 0 ? -1 : 1);
@@ -685,6 +737,16 @@ final class Window implements Host {
             }
             dirty.set(true);
         });
+        glfwSetWindowFocusCallback(handle, (window, focusedNow) -> {
+            if (!focusedNow) {
+                heldKeys.clear(); // releases happen elsewhere, a game would keep walking
+                heldButtons.clear();
+                if (pointerLock != null) {
+                    unlockPointer(pointerLock);
+                }
+            }
+            dirty.set(true);
+        });
         glfwSetFramebufferSizeCallback(handle, (window, w, h) -> dirty.set(true));
         glfwSetWindowContentScaleCallback(handle, (window, sx, sy) -> dirty.set(true));
         glfwSetWindowRefreshCallback(handle, window -> render());
@@ -692,6 +754,44 @@ final class Window implements Host {
 
     /** Called for keys nobody used: screen, component and app-wide shortcuts. Set by {@link Unweird}. */
     java.util.function.BiConsumer<KeyPress, Widget> shortcuts = (key, focus) -> { };
+
+    /** UI thread: hides the cursor and sends all mouse input to {@code widget} as relative movement. */
+    void lockPointer(Widget widget) {
+        if (pointerLock == widget) {
+            return;
+        }
+        if (pointerLock != null) {
+            unlockPointer(pointerLock);
+        }
+        if (pressed != null) {
+            pressed.pressed = false;
+            pressed = null;
+            pressedButton = -1;
+        }
+        hideTooltip();
+        pointerLock = widget;
+        glfwSetInputMode(handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        if (glfwRawMouseMotionSupported()) {
+            glfwSetInputMode(handle, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+        }
+        double[] x = new double[1], y = new double[1];
+        glfwGetCursorPos(handle, x, y);
+        lockX = x[0];
+        lockY = y[0];
+        widget.pointerLocked = true;
+    }
+
+    /** UI thread: gives the cursor back if {@code widget} holds it. */
+    void unlockPointer(Widget widget) {
+        if (pointerLock != widget) {
+            return;
+        }
+        pointerLock = null;
+        widget.pointerLocked = false;
+        glfwSetInputMode(handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        syncCursor();
+        updateHover();
+    }
 
     /** Focus asked for from code ({@link Widget#focus()}): only widgets that can take it and are reachable now. */
     void requestFocus(Widget widget) {

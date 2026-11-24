@@ -7,11 +7,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Hides the listed {@link Default} components on this screen. */
+/** Hides the listed {@link Default} components on this screen; {@code @Without} alone hides all of them. */
 @Documented
 @Inherited
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface Without {
-    Class<?>[] value();
+    Class<?>[] value() default {};
 }

@@ -148,6 +148,33 @@ public final class Unweird {
         }
     }
 
+    static void lockPointer(Widget widget, boolean lock) {
+        Window current = window;
+        if (current != null) {
+            if (lock) {
+                current.lockPointer(widget);
+            } else {
+                current.unlockPointer(widget);
+            }
+        }
+    }
+
+    /** Keys and mouse buttons held right now; empty sets without a window. */
+    static java.util.Set<Integer> heldKeys() {
+        Window current = window;
+        return current == null ? java.util.Set.of() : current.heldKeys;
+    }
+
+    static java.util.Set<Integer> pressedKeys() {
+        Window current = window;
+        return current == null ? java.util.Set.of() : current.pressedKeys;
+    }
+
+    static java.util.Set<Integer> heldButtons() {
+        Window current = window;
+        return current == null ? java.util.Set.of() : current.heldButtons;
+    }
+
     static void focus(Widget widget) {
         Window current = window;
         if (current != null) {

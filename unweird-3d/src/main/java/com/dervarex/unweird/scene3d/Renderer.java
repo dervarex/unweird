@@ -2,6 +2,7 @@ package com.dervarex.unweird.scene3d;
 
 import com.dervarex.unweird.style.Color;
 import org.joml.Matrix3f;
+import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryStack;
@@ -18,8 +19,12 @@ import java.util.Map;
 
 import static org.lwjgl.opengl.GL33C.*;
 
-/** Draws a {@link Scene} with OpenGL 3.3. One per {@link View3D}; UI thread only. */
-final class Renderer {
+/**
+ * Draws a {@link Scene} with OpenGL 3.3. {@link View3D} uses one; for your own widgets, call {@link #render} inside
+ * {@link com.dervarex.unweird.Canvas#gl Canvas.gl}. One per view (it keeps GPU copies of meshes and textures);
+ * UI thread only.
+ */
+public final class Renderer {
 
     private static final String VERTEX = """
             #version 330 core
@@ -33,11 +38,14 @@ final class Renderer {
             out vec3 vNormal;
             centroid out vec2 vUv; // centroid: antialiased edges must not sample outside their face
             out vec4 vColor;
+            out vec3 vWorld;
             void main() {
                 vNormal = normalize(uNormal * aNormal);
                 vUv = aUv;
                 vColor = aColor;
-                gl_Position = uViewProj * uModel * vec4(aPos, 1.0);
+                vec4 world = uModel * vec4(aPos, 1.0);
+                vWorld = world.xyz;
+                gl_Position = uViewProj * world;
             }
             """;
 
@@ -46,7 +54,11 @@ final class Renderer {
             in vec3 vNormal;
             centroid in vec2 vUv;
             in vec4 vColor;
+            in vec3 vWorld;
             uniform sampler2D uTexture;
+            uniform vec3 uEye;
+            uniform vec4 uFogColor;
+            uniform vec2 uFogRange;
             uniform vec4 uTint;
             uniform int uLit;
             uniform int uOpaque;
@@ -62,6 +74,10 @@ final class Renderer {
                     float direct = max(dot(n, -uSun), 0.0);
                     c.rgb *= uAmbient + (1.0 - uAmbient) * direct;
                 }
+                if (uFogColor.a > 0.0) {
+                    float f = clamp((length(vWorld - uEye) - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);
+                    c = mix(c, uFogColor, f);
+                }
                 if (uOpaque == 1) c.a = 1.0;
                 fragColor = vec4(c.rgb * c.a, c.a); // premultiplied, like the surface is composited
             }
@@ -70,7 +86,7 @@ final class Renderer {
     private static final int EVICT_AFTER_FRAMES = 300;
 
     private int program;
-    private int uModel, uViewProj, uNormal, uTexture, uTint, uLit, uOpaque, uSun, uAmbient, uCutoff;
+    private int uModel, uViewProj, uNormal, uTexture, uTint, uLit, uOpaque, uSun, uAmbient, uCutoff, uEye, uFogColor, uFogRange;
     private int whiteTexture;
     private final Map<Mesh, GlMesh> meshes = new IdentityHashMap<>();
     private final Map<Texture, GlTexture> textures = new IdentityHashMap<>();
@@ -89,7 +105,8 @@ final class Renderer {
     private record Item(Node node, Matrix4f world, float depth) {
     }
 
-    void render(Scene scene, Camera camera, int width, int height) {
+    /** Draws {@code scene} as {@code camera} sees it into the current target of {@code width × height} pixels. */
+    public void render(Scene scene, Camera camera, int width, int height) {
         frame++;
         if (program == 0) {
             setUp();
@@ -101,6 +118,9 @@ final class Renderer {
         }
         Matrix4f view = camera.view();
         Matrix4f viewProj = camera.projection((float) width / height).mul(view);
+        FrustumIntersection frustum = new FrustumIntersection(viewProj);
+        Vector3f boxMin = new Vector3f();
+        Vector3f boxMax = new Vector3f();
 
         List<Item> opaque = new ArrayList<>();
         List<Item> transparent = new ArrayList<>();
@@ -108,7 +128,13 @@ final class Renderer {
             if (node.mesh() == null || node.mesh().triangleCount() == 0) {
                 return;
             }
-            Vector3f center = node.mesh().min().add(node.mesh().max()).mul(0.5f);
+            Vector3f min = node.mesh().min();
+            Vector3f max = node.mesh().max();
+            world.transformAab(min, max, boxMin, boxMax);
+            if (!frustum.testAab(boxMin, boxMax)) {
+                return; // off screen
+            }
+            Vector3f center = min.add(max).mul(0.5f);
             world.transformPosition(center);
             view.transformPosition(center);
             (node.material().transparent ? transparent : opaque).add(new Item(node, world, center.z));
@@ -121,6 +147,15 @@ final class Renderer {
         }
         glUniform3f(uSun, scene.sunDirection.x, scene.sunDirection.y, scene.sunDirection.z);
         glUniform1f(uAmbient, scene.ambient);
+        Vector3f eye = camera.eye();
+        glUniform3f(uEye, eye.x, eye.y, eye.z);
+        Color fog = scene.fog;
+        if (fog != null) {
+            glUniform4f(uFogColor, fog.r(), fog.g(), fog.b(), 1);
+            glUniform2f(uFogRange, scene.fogStart, scene.fogEnd);
+        } else {
+            glUniform4f(uFogColor, 0, 0, 0, 0);
+        }
         glUniform1i(uTexture, 0);
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_DEPTH_TEST);
@@ -271,6 +306,9 @@ final class Renderer {
         uSun = glGetUniformLocation(program, "uSun");
         uAmbient = glGetUniformLocation(program, "uAmbient");
         uCutoff = glGetUniformLocation(program, "uCutoff");
+        uEye = glGetUniformLocation(program, "uEye");
+        uFogColor = glGetUniformLocation(program, "uFogColor");
+        uFogRange = glGetUniformLocation(program, "uFogRange");
 
         whiteTexture = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, whiteTexture);

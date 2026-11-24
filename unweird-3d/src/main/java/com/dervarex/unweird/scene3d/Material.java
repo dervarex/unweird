@@ -10,7 +10,8 @@ import java.util.Objects;
  */
 public final class Material {
 
-    Color color = Color.WHITE;
+    /** The color or tint (white for plain textures). */
+    @lombok.Getter Color color = Color.WHITE;
     Texture texture;
     boolean lit = true;
     float cutoff;

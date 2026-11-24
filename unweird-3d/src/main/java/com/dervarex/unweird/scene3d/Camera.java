@@ -7,6 +7,9 @@ import org.joml.Vector4f;
 /**
  * An orbit camera: looks at {@link #target} from {@code distance} away, turned by {@code yaw} (around Y) and
  * {@code pitch} (up/down), both in degrees. Yaw 0 looks from +Z towards -Z.
+ *
+ * <p>Or a first-person camera ({@link #firstPerson}): stands at a point and looks around from there; positive pitch
+ * looks up.
  */
 public final class Camera {
 
@@ -19,12 +22,50 @@ public final class Camera {
     float far = 1000;
     float minDistance = 0.5f;
     float maxDistance = 500;
+    boolean firstPerson;
 
     public static Camera orbit(float targetX, float targetY, float targetZ, float distance) {
         Camera camera = new Camera();
         camera.target.set(targetX, targetY, targetZ);
         camera.distance = distance;
         return camera;
+    }
+
+    /** A camera standing at (x, y, z), looking along -Z; turn it with {@link #angles}. */
+    public static Camera firstPerson(float x, float y, float z) {
+        Camera camera = new Camera();
+        camera.firstPerson = true;
+        camera.target.set(x, y, z);
+        camera.pitch = 0;
+        return camera;
+    }
+
+    /** Moves a first-person camera (or an orbit camera's target). */
+    public Camera position(float x, float y, float z) {
+        target.set(x, y, z);
+        return this;
+    }
+
+    /** Whether this is a {@link #firstPerson} camera. */
+    public boolean isFirstPerson() {
+        return firstPerson;
+    }
+
+    /** The unit vector the camera looks along. */
+    public Vector3f forward() {
+        if (firstPerson) {
+            double yawRad = Math.toRadians(yaw);
+            double pitchRad = Math.toRadians(pitch);
+            return new Vector3f((float) (-Math.sin(yawRad) * Math.cos(pitchRad)), (float) Math.sin(pitchRad),
+                    (float) (-Math.cos(yawRad) * Math.cos(pitchRad)));
+        }
+        return new Vector3f(target).sub(eye()).normalize();
+    }
+
+    /** The far clipping distance (how far you can see), 1000 by default. */
+    public Camera viewDistance(float far) {
+        this.far = Math.max(near * 2, far);
+        return this;
     }
 
     public Camera angles(float yawDegrees, float pitchDegrees) {
@@ -74,6 +115,9 @@ public final class Camera {
 
     /** Where the camera is. */
     public Vector3f eye() {
+        if (firstPerson) {
+            return new Vector3f(target);
+        }
         double yawRad = Math.toRadians(yaw);
         double pitchRad = Math.toRadians(pitch);
         float x = (float) (Math.sin(yawRad) * Math.cos(pitchRad));
@@ -83,6 +127,9 @@ public final class Camera {
     }
 
     Matrix4f view() {
+        if (firstPerson) {
+            return new Matrix4f().lookAt(target, new Vector3f(target).add(forward()), new Vector3f(0, 1, 0));
+        }
         return new Matrix4f().lookAt(eye(), target, new Vector3f(0, 1, 0));
     }
 
@@ -90,8 +137,8 @@ public final class Camera {
         return new Matrix4f().perspective((float) Math.toRadians(fov), Math.max(0.01f, aspect), near, far);
     }
 
-    /** Turns the camera by mouse movement. */
-    void orbitBy(float dYaw, float dPitch) {
+    /** Turns the camera by mouse movement (degrees). */
+    public void orbitBy(float dYaw, float dPitch) {
         yaw += dYaw;
         pitch = clampPitch(pitch + dPitch);
     }

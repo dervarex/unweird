@@ -12,6 +12,8 @@ lwjgl = { module = "org.lwjgl:lwjgl" }
 lwjgl-glfw = { module = "org.lwjgl:lwjgl-glfw" }
 lwjgl-opengl = { module = "org.lwjgl:lwjgl-opengl" }
 lwjgl-nanovg = { module = "org.lwjgl:lwjgl-nanovg" }
+lwjgl-openal = { module = "org.lwjgl:lwjgl-openal" }
+lwjgl-stb = { module = "org.lwjgl:lwjgl-stb" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 joml = { module = "org.joml:joml", version.ref = "joml" }
 imageio-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
