@@ -39,20 +39,41 @@ public final class Unweird {
         if (System.getProperty("java.awt.headless") == null) {
             System.setProperty("java.awt.headless", "true"); // image decoding via ImageIO must not start an AWT GUI next to GLFW
         }
-        Window created = new Window(theme, app);
+        GlfwWindow desktop = new GlfwWindow(theme, app);
+        try {
+            begin(desktop.window(), firstScreen);
+            desktop.run();
+        } finally {
+            end();
+            desktop.destroy();
+        }
+    }
+
+    /** A backend created {@code created} on the UI thread: show the first screen in it. */
+    static void begin(Window created, Class<? extends Screen> firstScreen) {
+        if (window != null) {
+            throw new IllegalStateException("unweird is already running");
+        }
         window = created;
         created.shortcuts = (key, focused) -> Shortcuts.dispatch(key, focused, current, created);
         screens = new Screens();
+        navigate(firstScreen);
+    }
+
+    /** The window is closing: run onHide and whileShown hooks for cleanup. UI thread. */
+    static void end() {
         try {
-            navigate(firstScreen);
-            created.run();
+            leave(current, List.of());
         } finally {
-            leave(current, List.of()); // the window is closing: run onHide and whileShown hooks for cleanup
             window = null;
             screens = null;
             current = null;
-            created.close();
         }
+    }
+
+    /** Whether a window is showing (unweird was started and not closed yet). */
+    static boolean running() {
+        return window != null;
     }
 
     /**
@@ -253,6 +274,10 @@ public final class Unweird {
      * @return false if no opener could be started (e.g. {@code xdg-open} is missing); show the link yourself then
      */
     public static boolean open(String target) {
+        java.util.function.Predicate<String> custom = opener;
+        if (custom != null) {
+            return custom.test(target);
+        }
         try {
             new ProcessBuilder(openCommand(System.getProperty("os.name", ""), target))
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
@@ -264,6 +289,9 @@ public final class Unweird {
             return false;
         }
     }
+
+    /** How {@link #open(String)} opens things where there are no desktop commands (Android); null for those. */
+    static volatile java.util.function.Predicate<String> opener;
 
     /** Opens a file (or folder) in the user's default app. See {@link #open(String)}. */
     public static boolean open(java.nio.file.Path file) {

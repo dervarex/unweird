@@ -24,7 +24,7 @@ final class FieldIndex {
     static List<Widget> widgetsOf(Container owner) {
         List<Class<?>> chain = new ArrayList<>();
         for (Class<?> type = owner.getClass(); !isCoreBase(type); type = type.getSuperclass()) {
-            chain.addFirst(type);
+            chain.add(0, type);
         }
 
         List<Widget> widgets = new ArrayList<>();

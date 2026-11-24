@@ -22,6 +22,12 @@ import static org.lwjgl.glfw.GLFW.*;
  */
 public record KeyPress(int code, int mods, boolean repeat) {
 
+    /** Modifier bits in {@link #mods()} (GLFW's values; other platforms translate theirs). */
+    static final int MOD_SHIFT = GLFW_MOD_SHIFT;
+    static final int MOD_CONTROL = GLFW_MOD_CONTROL;
+    static final int MOD_ALT = GLFW_MOD_ALT;
+    static final int MOD_SUPER = GLFW_MOD_SUPER;
+
     private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
 
     private static final Map<Integer, String> NAMES = Map.ofEntries(

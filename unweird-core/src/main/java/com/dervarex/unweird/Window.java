@@ -3,39 +3,20 @@ package com.dervarex.unweird;
 import com.dervarex.unweird.annotation.Title;
 import com.dervarex.unweird.style.Color;
 import com.dervarex.unweird.style.Theme;
-import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.glfw.GLFWVidMode;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.system.MemoryUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.nanovg.NanoVG.nvgAddFallbackFontId;
-import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
-import static org.lwjgl.nanovg.NanoVG.nvgCreateFontMem;
-import static org.lwjgl.nanovg.NanoVG.nvgEndFrame;
-import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
-import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
-import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
-import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
-import static org.lwjgl.opengl.GL11C.*;
-import static org.lwjgl.system.MemoryUtil.NULL;
-
 /**
- * The native window: GLFW for the window and input, OpenGL + NanoVG for drawing.
- * Everything here runs on the UI thread, except {@link #requestRender()}.
- *
- * <p>Rendering is event-driven: the loop sleeps in {@code glfwWaitEvents} and only draws
- * when something changed (or a focused field's caret blinks).
+ * The app's one window, independent of the system it runs on: screens, overlays, focus, hover, input routing,
+ * timers, toasts and tooltips. A {@link Platform} backend ({@link GlfwWindow} on desktop, an Activity on Android)
+ * feeds it input in window coordinates, runs its loop and supplies a {@link Vg} to draw with.
+ * Everything here runs on the UI thread, except {@link #requestRender()} and the other methods marked thread-safe.
  */
 final class Window implements Host {
 
@@ -44,16 +25,22 @@ final class Window implements Host {
     private static final double MULTI_CLICK_SECONDS = 0.4;
     private static final double MULTI_CLICK_DISTANCE = 4;
 
-    private final long handle;
-    private final long vg;
-    private final java.util.EnumMap<Cursor, Long> cursors = new java.util.EnumMap<>(Cursor.class);
-    private final ByteBuffer regularFontData;
-    private final ByteBuffer semiboldFontData;
-    private final List<ByteBuffer> fallbackData = new java.util.ArrayList<>();
-    private final Canvas canvas;
+    /** Mouse buttons, as GLFW numbers them. */
+    static final int BUTTON_LEFT = 0;
+    static final int BUTTON_RIGHT = 1;
+    static final int BUTTON_MIDDLE = 2;
+
+    /** Key codes are GLFW's; other platforms translate theirs. */
+    static final int KEY_TAB = 258;
+    static final int KEY_ESCAPE = 256;
+    static final int MOD_SHIFT = 0x1;
+
+    private final Platform platform;
+    private final App app;
+    private Canvas canvas;
     private final AtomicBoolean dirty = new AtomicBoolean(true);
     private final Queue<Runnable> uiTasks = new ConcurrentLinkedQueue<>();
-    /** Timers by due time (glfwGetTime seconds). Guarded by itself. */
+    /** Timers by due time ({@link Platform#time()} seconds). Guarded by itself. */
     private final java.util.PriorityQueue<Timer> timers = new java.util.PriorityQueue<>();
     private long timerSequence;
     /** Visible toasts, oldest first. UI thread only. */
@@ -88,117 +75,56 @@ final class Window implements Host {
     private double cursorY = -1;
     /** Window coordinates → logical pixels. */
     private float windowToLogical = 1;
+    /** Parts of the window covered by the system (status bar, on-screen keyboard...), in logical pixels. */
+    private float insetLeft;
+    private float insetTop;
+    private float insetRight;
+    private float insetBottom;
 
-    private final App app;
-    private volatile int lastErrorCode;
-    private volatile String lastError = "no details";
-    private final Path boundsFile;
-    /** Last position/size while not maximized, so a maximized window still remembers its normal bounds. */
-    private int normalX;
-    private int normalY;
-    private int normalWidth;
-    private int normalHeight;
-
-    Window(Theme theme, App app) {
+    Window(Theme theme, App app, Platform platform, Vg vg) {
         this.theme = theme;
         this.app = app;
-        this.boundsFile = app.remember ? WindowBounds.file(app.name) : null;
+        this.platform = platform;
+        this.canvas = createCanvas(vg);
+    }
 
-        // remember GLFW's last error, so failures can be explained instead of just reported
-        glfwSetErrorCallback((code, description) -> {
-            lastErrorCode = code;
-            lastError = GLFWErrorCallback.getDescription(description);
-            System.err.println("unweird: GLFW: " + lastError);
-        });
-        if (!glfwInit()) {
-            GLFWErrorCallback callback = glfwSetErrorCallback(null);
-            if (callback != null) {
-                callback.free();
-            }
-            throw new IllegalStateException(explainFailure(lastErrorCode, lastError, false));
-        }
-
-        glfwDefaultWindowHints();
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-        glfwWindowHint(GLFW_STENCIL_BITS, 8);
-
-        WindowBounds saved = boundsFile == null ? null : WindowBounds.load(boundsFile);
-        int width = saved != null ? saved.width() : app.width;
-        int height = saved != null ? saved.height() : app.height;
-        handle = glfwCreateWindow(width, height, app.name, NULL, NULL);
-        if (handle == NULL) {
-            String message = explainFailure(lastErrorCode, lastError, true);
-            glfwTerminate();
-            GLFWErrorCallback callback = glfwSetErrorCallback(null);
-            if (callback != null) {
-                callback.free();
-            }
-            throw new IllegalStateException(message);
-        }
-        if (app.minWidth > 0 || app.minHeight > 0) {
-            glfwSetWindowSizeLimits(handle, app.minWidth > 0 ? app.minWidth : GLFW_DONT_CARE,
-                    app.minHeight > 0 ? app.minHeight : GLFW_DONT_CARE, GLFW_DONT_CARE, GLFW_DONT_CARE);
-        }
-        boolean wayland = glfwGetPlatform() == GLFW_PLATFORM_WAYLAND; // no window positions or icons there
-        if (!wayland && saved != null && onSomeMonitor(saved)) {
-            glfwSetWindowPos(handle, saved.x(), saved.y());
-        } else if (!wayland) {
-            centerOnPrimaryMonitor();
-        }
-        if (app.icon != null && !wayland) {
-            setIcon(app.icon);
-        }
-        boolean startMaximized = saved != null ? saved.maximized() : app.maximized;
-        if (startMaximized) {
-            glfwMaximizeWindow(handle);
-        }
-        rememberNormalBounds();
-
-        glfwMakeContextCurrent(handle);
-        GL.createCapabilities();
-        glfwSwapInterval(1);
-
-        vg = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
-        if (vg == NULL) {
-            throw new IllegalStateException("unweird: could not initialise NanoVG");
-        }
-        regularFontData = loadResource(FONT_DIR + "NotoSans-Regular.ttf");
-        semiboldFontData = loadResource(FONT_DIR + "NotoSans-SemiBold.ttf");
-        int regular = nvgCreateFontMem(vg, "regular", regularFontData, false);
-        int semibold = nvgCreateFontMem(vg, "semibold", semiboldFontData, false);
+    /** Loads the fonts into {@code vg} and makes a canvas drawing with it. */
+    private Canvas createCanvas(Vg vg) {
+        int regular = vg.createFont("regular", loadResource(FONT_DIR + "NotoSans-Regular.ttf"));
+        int semibold = vg.createFont("semibold", loadResource(FONT_DIR + "NotoSans-SemiBold.ttf"));
         if (regular < 0 || semibold < 0) {
             throw new IllegalStateException("unweird: could not load the bundled fonts");
         }
         // characters Noto Sans does not have: symbols, arrows and math, emoji, then whatever the app adds (CJK, ...)
         List<String> fallbacks = new java.util.ArrayList<>(List.of(FONT_DIR + "NotoSansSymbols2-Regular.ttf", FONT_DIR + "NotoSansMath-Regular.ttf", FONT_DIR + "NotoEmoji.ttf"));
         fallbacks.addAll(app.fallbackFonts);
+        int count = 0;
         for (String resource : fallbacks) {
-            ByteBuffer data;
+            byte[] data;
             try {
                 data = loadResource(resource.startsWith("/") ? resource : "/" + resource);
             } catch (RuntimeException e) {
                 System.err.println("unweird: can't load fallback font " + resource + ": " + e.getMessage());
                 continue;
             }
-            int font = nvgCreateFontMem(vg, "fallback-" + fallbackData.size(), data, false);
+            int font = vg.createFont("fallback-" + count++, data);
             if (font < 0) {
-                MemoryUtil.memFree(data);
                 System.err.println("unweird: " + resource + " isn't a font NanoVG can read");
                 continue;
             }
-            fallbackData.add(data);
-            nvgAddFallbackFontId(vg, regular, font);
-            nvgAddFallbackFontId(vg, semibold, font);
+            vg.addFallbackFont(regular, font);
+            vg.addFallbackFont(semibold, font);
         }
-        canvas = new Canvas(vg, regular, semibold, theme);
+        return new Canvas(vg, regular, semibold, theme);
+    }
 
-        installCallbacks();
+    /**
+     * The drawing context was lost and {@code vg} replaces it (Android does this when the app goes to the background).
+     * Images and GL surfaces are loaded again on first use.
+     */
+    void replaceVg(Vg vg) {
+        canvas = createCanvas(vg);
+        dirty.set(true);
     }
 
     void show(Screen next) {
@@ -211,12 +137,12 @@ final class Window implements Host {
             pressed = null;
         }
         while (!overlays.isEmpty()) {
-            closeOverlay(overlays.getFirst());
+            closeOverlay(overlays.get(0));
         }
         focus(null, false);
         screen = next;
         Title title = next.getClass().getAnnotation(Title.class);
-        glfwSetWindowTitle(handle, title == null ? app.name
+        platform.title(title == null ? app.name
                 : app.name.equals(Unweird.DEFAULT_NAME) || title.value().equals(app.name) ? title.value()
                 : title.value() + " — " + app.name);
 
@@ -235,36 +161,51 @@ final class Window implements Host {
         dirty.set(true);
     }
 
+    Theme theme() {
+        return theme;
+    }
+
     private boolean frameRequested;
-    private double lastFrameTime;
-    private static final double MIN_FRAME_SECONDS = 1.0 / 120; // cap for animations where vsync doesn't throttle
 
     /** UI thread (from draw): render again right after this frame. */
     void requestFrame() {
         frameRequested = true;
     }
 
-    /** Thread-safe: ends the loop after the current iteration. */
+    /** Whether something asked to be drawn again right after the last frame (an animation). */
+    boolean animating() {
+        return frameRequested;
+    }
+
+    /** Thread-safe: ends the app after the current iteration. */
     void requestClose() {
-        glfwSetWindowShouldClose(handle, true);
-        glfwPostEmptyEvent();
+        platform.close();
     }
 
     /** Thread-safe: asks the UI thread to re-evaluate and redraw. */
     void requestRender() {
         dirty.set(true);
-        glfwPostEmptyEvent();
+        platform.wake();
+    }
+
+    /** Whether a render is due; clears the flag. */
+    boolean takeDirty() {
+        return dirty.getAndSet(false);
+    }
+
+    void markDirty() {
+        dirty.set(true);
     }
 
     /** Runs {@code task} on the UI thread after {@code seconds}. Thread-safe. Returns a handle to cancel it. */
     Runnable schedule(double seconds, Runnable task) {
         Timer timer;
         synchronized (timers) {
-            timer = new Timer(glfwGetTime() + Math.max(0, seconds), timerSequence++, task);
+            timer = new Timer(platform.time() + Math.max(0, seconds), timerSequence++, task);
             timers.add(timer);
         }
         if (Thread.currentThread() != uiThread) {
-            glfwPostEmptyEvent(); // wake the loop so it recomputes how long to sleep
+            platform.wake(); // wake the loop so it recomputes how long to sleep
         }
         return () -> {
             synchronized (timers) {
@@ -273,27 +214,42 @@ final class Window implements Host {
         };
     }
 
-    private void runDueTimers() {
-        double now = glfwGetTime();
+    /** One loop iteration's housekeeping: queued tasks, due timers and the caret blink. */
+    void runPending() {
+        for (Runnable task; (task = uiTasks.poll()) != null; ) {
+            safely(null, task);
+        }
+        double now = platform.time();
         while (true) {
             Timer due;
             synchronized (timers) {
                 Timer next = timers.peek();
                 if (next == null || next.due > now) {
-                    return;
+                    break;
                 }
                 due = timers.poll();
             }
             safely(null, due.task);
             dirty.set(true);
         }
+        if (focused != null && focused.blinks() && now >= nextBlink) {
+            focused.caretOn = !focused.caretOn;
+            nextBlink = now + BLINK_SECONDS;
+            dirty.set(true);
+        }
     }
 
-    private double nextTimerDue() {
+    /** When the next timer or caret blink is due ({@link Platform#time()} seconds), or {@link Double#MAX_VALUE}. */
+    double nextWake() {
+        double wake;
         synchronized (timers) {
             Timer next = timers.peek();
-            return next == null ? Double.MAX_VALUE : next.due;
+            wake = next == null ? Double.MAX_VALUE : next.due;
         }
+        if (focused != null && focused.blinks()) {
+            wake = Math.min(wake, nextBlink);
+        }
+        return wake;
     }
 
     private record Timer(double due, long sequence, Runnable task) implements Comparable<Timer> {
@@ -326,7 +282,7 @@ final class Window implements Host {
         ShownToast shown = new ShownToast(toast);
         toasts.add(shown);
         while (toasts.size() > MAX_TOASTS) {
-            toasts.removeFirst();
+            toasts.remove(0);
         }
         schedule(toast.duration().toMillis() / 1000.0, () -> toasts.remove(shown));
         dirty.set(true);
@@ -390,109 +346,33 @@ final class Window implements Host {
         }
     }
 
-    /** Runs until the window is closed. Blocks the calling (UI) thread. */
-    void run() {
-        glfwShowWindow(handle);
-        if (boundsFile != null) {
-            glfwSetWindowPosCallback(handle, (window, x, y) -> rememberNormalBounds());
-            glfwSetWindowSizeCallback(handle, (window, w, h) -> rememberNormalBounds());
-        }
-        while (!glfwWindowShouldClose(handle)) {
-            for (Runnable task; (task = uiTasks.poll()) != null; ) {
-                safely(null, task);
-            }
-            runDueTimers();
-            if (focused != null && focused.blinks() && glfwGetTime() >= nextBlink) {
-                focused.caretOn = !focused.caretOn;
-                nextBlink = glfwGetTime() + BLINK_SECONDS;
-                dirty.set(true);
-            }
-            if (dirty.getAndSet(false)) {
-                double sinceLast = glfwGetTime() - lastFrameTime;
-                if (frameRequested && sinceLast < MIN_FRAME_SECONDS) {
-                    dirty.set(true);
-                    glfwWaitEventsTimeout(MIN_FRAME_SECONDS - sinceLast); // still handle input while animating
-                    continue;
-                }
-                // Handle input before every frame. With vsync each frame takes ~16 ms, so an animating screen would
-                // otherwise render back to back and never get to the input (clicks and drags did nothing).
-                glfwPollEvents();
-                frameRequested = false;
-                lastFrameTime = glfwGetTime();
-                render();
-                if (frameRequested) {
-                    dirty.set(true); // someone is animating
-                }
-                continue;
-            }
-            double wake = nextTimerDue();
-            if (focused != null && focused.blinks()) {
-                wake = Math.min(wake, nextBlink);
-            }
-            if (wake == Double.MAX_VALUE) {
-                glfwWaitEvents();
-            } else {
-                double wait = wake - glfwGetTime();
-                if (wait > 0) {
-                    glfwWaitEventsTimeout(wait);
-                }
-            }
-        }
+    boolean onUiThread() {
+        return Thread.currentThread() == uiThread;
     }
 
-    void close() {
-        if (boundsFile != null) {
-            boolean maximized = glfwGetWindowAttrib(handle, GLFW_MAXIMIZED) == GLFW_TRUE;
-            rememberNormalBounds();
-            if (normalWidth > 0 && normalHeight > 0) {
-                new WindowBounds(normalX, normalY, normalWidth, normalHeight, maximized).save(boundsFile);
-            }
-        }
-        org.lwjgl.glfw.Callbacks.glfwFreeCallbacks(handle);
+    void free() {
         canvas.free();
-        nvgDelete(vg);
-        MemoryUtil.memFree(regularFontData);
-        MemoryUtil.memFree(semiboldFontData);
-        fallbackData.forEach(MemoryUtil::memFree);
-        cursors.values().forEach(cursor -> {
-            if (cursor != NULL) {
-                glfwDestroyCursor(cursor);
-            }
-        });
-        glfwDestroyWindow(handle);
-        glfwTerminate();
-        GLFWErrorCallback previous = glfwSetErrorCallback(null);
-        if (previous != null) {
-            previous.free();
-        }
     }
 
-    private void render() {
-        int[] fbWidth = new int[1], fbHeight = new int[1], winWidth = new int[1], winHeight = new int[1];
-        float[] scaleX = new float[1], scaleY = new float[1];
-        glfwGetFramebufferSize(handle, fbWidth, fbHeight);
-        glfwGetWindowSize(handle, winWidth, winHeight);
-        glfwGetWindowContentScale(handle, scaleX, scaleY);
-        if (fbWidth[0] == 0 || fbHeight[0] == 0 || winWidth[0] == 0) {
-            return; // minimized
-        }
-
-        // Some platforms (macOS, Wayland) already scale window coordinates and only the framebuffer is larger;
-        // others (X11, Windows) report physical pixels and a content scale. Logical pixels cover both.
-        float framebufferPerWindow = fbWidth[0] / (float) winWidth[0];
-        float scale = Math.max(framebufferPerWindow, scaleX[0]);
-        windowToLogical = framebufferPerWindow / scale;
-
+    /**
+     * Draws everything. The framebuffer is {@code framebufferWidth} x {@code framebufferHeight} physical pixels,
+     * {@code scale} physical pixels make one logical pixel, and one window coordinate (what input comes in) is
+     * {@code windowToLogical} logical pixels.
+     */
+    void render(int framebufferWidth, int framebufferHeight, float scale, float windowToLogical) {
+        this.windowToLogical = windowToLogical;
+        frameRequested = false;
+        flingStep();
+        Vg vg = canvas.vg();
         Color bg = theme.getBackground();
-        glViewport(0, 0, fbWidth[0], fbHeight[0]);
-        glClearColor(bg.r(), bg.g(), bg.b(), 1);
-        glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        vg.clear(framebufferWidth, framebufferHeight, bg.r(), bg.g(), bg.b());
 
-        nvgBeginFrame(vg, fbWidth[0] / scale, fbHeight[0] / scale, scale);
+        vg.beginFrame(framebufferWidth / scale, framebufferHeight / scale, scale);
+        vg.translate(insetLeft, insetTop);
         canvas.setTheme(theme);
-        canvas.beginFrame(scale, glfwGetTime(), fbWidth[0], fbHeight[0]);
-        float logicalWidth = fbWidth[0] / scale;
-        float logicalHeight = fbHeight[0] / scale;
+        canvas.beginFrame(scale, platform.time(), framebufferWidth, framebufferHeight);
+        float logicalWidth = framebufferWidth / scale - insetLeft - insetRight;
+        float logicalHeight = framebufferHeight / scale - insetTop - insetBottom;
         if (screen != null) {
             screen.render(canvas, logicalWidth, logicalHeight);
         }
@@ -503,9 +383,8 @@ final class Window implements Host {
         }
         drawToasts(logicalWidth, logicalHeight);
         drawTooltip(logicalWidth, logicalHeight);
-        nvgEndFrame(vg);
+        vg.endFrame();
         canvas.collectSurfaces();
-        glfwSwapBuffers(handle);
 
         if (focused != null && !focused.interactive()) {
             focus(null, false); // it was disabled or hidden by the last change
@@ -513,185 +392,359 @@ final class Window implements Host {
         updateHover(); // the layout may have moved something under the cursor
     }
 
-    private void installCallbacks() {
-        glfwSetCursorPosCallback(handle, (window, x, y) -> {
-            cursorX = x;
-            cursorY = y;
-            if (pressed != null) {
-                Widget dragging = pressed;
-                float dx = (float) (x - lastDragX) * windowToLogical;
-                float dy = (float) (y - lastDragY) * windowToLogical;
-                lastDragX = x;
-                lastDragY = y;
-                safely(dragging, () -> dragging.pointerDrag(pointer(buttonOf(pressedButton), 0, dx, dy)));
-                resetBlink();
-                dirty.set(true);
-            }
-            updateHover();
-            Widget over = hovered;
-            if (over != null && pressed == null) {
-                boolean[] changed = {false};
-                safely(over, () -> changed[0] = over.pointerMove(pointer(Pointer.Button.NONE, 0, 0, 0)));
-                if (changed[0]) {
-                    dirty.set(true);
-                }
-            }
-        });
-        glfwSetCursorEnterCallback(handle, (window, entered) -> {
-            if (entered) {
-                syncCursor();
-            } else {
-                cursorX = -1;
-                cursorY = -1;
-            }
-            updateHover();
-        });
-        glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
-            if (action == GLFW_PRESS) {
-                if (pressed != null) {
-                    return; // one button at a time
-                }
-                syncCursor(); // a press can arrive before any move event (e.g. right after entering the window)
-                if (dismissToastAt(logical(cursorX), logical(cursorY))) {
-                    return;
-                }
-                updateHover();
-                if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                    countClicks();
-                }
-                Overlay top = topOverlay();
-                if (top != null && !top.modal() && !top.contains(logical(cursorX), logical(cursorY))) {
-                    closeOverlay(top); // a click outside a popup only closes it
-                    return;
-                }
-                hideTooltip();
-                if (hovered == null || !hovered.interactive()) {
-                    if (top == null || !top.modal()) {
-                        focus(null, false); // clicking empty space drops focus
-                    }
-                    return;
-                }
-                pressed = hovered;
-                pressedButton = button;
-                lastDragX = cursorX;
-                lastDragY = cursorY;
-                pressed.pressed = button == GLFW_MOUSE_BUTTON_LEFT;
-                if (pressed.focusable()) {
-                    focus(pressed, false);
-                }
-                Widget target = pressed;
-                int clicks = button == GLFW_MOUSE_BUTTON_LEFT ? clickCount : 1;
-                safely(target, () -> target.pointerDown(pointer(buttonOf(button), clicks, 0, 0)));
-                dirty.set(true);
-            } else if (action == GLFW_RELEASE && pressed != null && button == pressedButton) {
-                Widget released = pressed;
-                pressed = null;
-                pressedButton = -1;
-                released.pressed = false;
-                safely(released, () -> released.pointerUp(pointer(buttonOf(button), 0, 0, 0)));
-                if (button == GLFW_MOUSE_BUTTON_LEFT && released == hovered && released.clickable()) {
-                    safely(released, () -> released.activate(this));
-                }
-                updateHover();
-                dirty.set(true);
-            }
-        });
-        glfwSetKeyCallback(handle, (window, key, scancode, action, mods) -> {
-            if (action == GLFW_RELEASE) {
-                return;
-            }
-            resetBlink();
-            hideTooltip();
-            int code = layoutKey(key, scancode);
-            Overlay top = topOverlay();
-            if (code == GLFW_KEY_TAB) {
-                moveFocus((mods & GLFW_MOD_SHIFT) != 0 ? -1 : 1);
-            } else {
-                boolean[] used = {false};
-                Widget target = focused;
-                if (target != null) {
-                    safely(target, () -> used[0] = target.keyPressed(code, mods, this));
-                }
-                if (!used[0] && top != null) {
-                    if (code == GLFW_KEY_ESCAPE) {
-                        safely(top, top::escape);
-                        if (!top.modal()) {
-                            closeOverlay(top);
-                        }
-                        used[0] = true;
-                    } else if (top.modal()) {
-                        safely(top, () -> used[0] = top.keyPressed(code, mods, this));
-                    }
-                }
-                if (!used[0] && (top == null || !top.modal())) {
-                    shortcuts.accept(new KeyPress(code, mods, action == GLFW_REPEAT), focused);
-                }
-            }
-            dirty.set(true); // the key may have changed state that lambdas read
-        });
-        glfwSetCharCallback(handle, (window, codePoint) -> {
-            resetBlink();
+    /**
+     * Parts of the window the system covers (status and navigation bars, the on-screen keyboard), in logical pixels.
+     * Screens are laid out in what's left.
+     */
+    void insets(float left, float top, float right, float bottom) {
+        if (left == insetLeft && top == insetTop && right == insetRight && bottom == insetBottom) {
+            return;
+        }
+        boolean shrunk = bottom > insetBottom;
+        insetLeft = left;
+        insetTop = top;
+        insetRight = right;
+        insetBottom = bottom;
+        if (shrunk && focused != null && screen != null && modalOverlay() == null) {
             Widget target = focused;
-            if (target != null) {
-                safely(target, () -> target.typed(codePoint, this));
-            }
-            dirty.set(true);
-        });
-        glfwSetScrollCallback(handle, (window, dx, dy) -> {
-            hideTooltip();
-            Pointer at = pointer(Pointer.Button.NONE, 0, 0, 0);
-            for (Widget w = hovered; w != null; w = w.parent) { // the widget under the mouse first, then its parents
-                Widget candidate = w;
-                boolean[] used = {false};
-                safely(candidate, () -> used[0] = candidate.scrolled(at, dx, dy));
-                if (used[0]) {
-                    dirty.set(true);
-                    return;
-                }
-            }
-            Overlay top = topOverlay();
-            if (top != null) {
-                if (top.contains(at.x(), at.y()) && top.scrolled(at, dx, dy)) {
-                    dirty.set(true);
-                }
-                return; // the page doesn't scroll away under an open popup or dialog
-            }
-            if (screen != null && screen.scrollBy(at.x(), at.y(), dy)) {
-                dirty.set(true);
-            }
-        });
-        glfwSetDropCallback(handle, (window, count, names) -> {
-            List<java.nio.file.Path> files = new java.util.ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                try {
-                    files.add(java.nio.file.Path.of(org.lwjgl.glfw.GLFWDropCallback.getName(names, i)));
-                } catch (java.nio.file.InvalidPathException ignored) {
-                    // not a local file
-                }
-            }
-            syncCursor();
-            if (files.isEmpty() || screen == null || modalOverlay() != null) {
-                return;
-            }
-            Pointer at = pointer(Pointer.Button.NONE, 0, 0, 0);
-            List<java.nio.file.Path> dropped = List.copyOf(files);
-            for (Widget w = screen.widgetAt(at.x(), at.y()); w != null; w = w.parent) { // the widget under the mouse, then outwards
-                Widget candidate = w;
-                boolean[] used = {false};
-                safely(candidate, () -> used[0] = candidate.onDrop(at, dropped));
-                if (used[0]) {
-                    break;
-                }
-            }
-            dirty.set(true);
-        });
-        glfwSetFramebufferSizeCallback(handle, (window, w, h) -> dirty.set(true));
-        glfwSetWindowContentScaleCallback(handle, (window, sx, sy) -> dirty.set(true));
-        glfwSetWindowRefreshCallback(handle, window -> render());
+            uiTasksLater(() -> screen.reveal(target)); // after the next layout: keep the field above the keyboard
+        }
+        dirty.set(true);
     }
 
-    /** Called for keys nobody used: screen, component and app-wide shortcuts. Set by {@link Unweird}. */
-    java.util.function.BiConsumer<KeyPress, Widget> shortcuts = (key, focus) -> { };
+    // ---- input, in window coordinates ----
+
+    /** The pointer moved to (x, y), in window coordinates. */
+    void pointerMoved(double x, double y) {
+        cursorX = x;
+        cursorY = y;
+        if (pressed != null) {
+            Widget dragging = pressed;
+            float dx = (float) (x - lastDragX) * windowToLogical;
+            float dy = (float) (y - lastDragY) * windowToLogical;
+            lastDragX = x;
+            lastDragY = y;
+            safely(dragging, () -> dragging.pointerDrag(pointer(buttonOf(pressedButton), 0, dx, dy)));
+            resetBlink();
+            dirty.set(true);
+        }
+        updateHover();
+        Widget over = hovered;
+        if (over != null && pressed == null) {
+            boolean[] changed = {false};
+            safely(over, () -> changed[0] = over.pointerMove(pointer(Pointer.Button.NONE, 0, 0, 0)));
+            if (changed[0]) {
+                dirty.set(true);
+            }
+        }
+    }
+
+    /** Sets where the pointer is without reporting a move (it entered the window, or a press came first). */
+    void pointerAt(double x, double y) {
+        cursorX = x;
+        cursorY = y;
+    }
+
+    /** The pointer left the window (or a finger was lifted). */
+    void pointerLeft() {
+        cursorX = -1;
+        cursorY = -1;
+        updateHover();
+    }
+
+    void pointerButton(int button, boolean down) {
+        if (down) {
+            if (pressed != null) {
+                return; // one button at a time
+            }
+            if (dismissToastAt(logicalX(cursorX), logicalY(cursorY))) {
+                return;
+            }
+            updateHover();
+            if (button == BUTTON_LEFT) {
+                countClicks();
+            }
+            Overlay top = topOverlay();
+            if (top != null && !top.modal() && !top.contains(logicalX(cursorX), logicalY(cursorY))) {
+                closeOverlay(top); // a click outside a popup only closes it
+                return;
+            }
+            hideTooltip();
+            if (hovered == null || !hovered.interactive()) {
+                if (top == null || !top.modal()) {
+                    focus(null, false); // clicking empty space drops focus
+                }
+                return;
+            }
+            pressed = hovered;
+            pressedButton = button;
+            lastDragX = cursorX;
+            lastDragY = cursorY;
+            pressed.pressed = button == BUTTON_LEFT;
+            if (pressed.focusable()) {
+                focus(pressed, false);
+            }
+            if (pressed.blinks()) {
+                platform.textInput(true); // tapped a text field: bring up the on-screen keyboard
+            }
+            Widget target = pressed;
+            int clicks = button == BUTTON_LEFT ? clickCount : 1;
+            safely(target, () -> target.pointerDown(pointer(buttonOf(button), clicks, 0, 0)));
+            dirty.set(true);
+        } else if (pressed != null && button == pressedButton) {
+            Widget released = pressed;
+            pressed = null;
+            pressedButton = -1;
+            released.pressed = false;
+            safely(released, () -> released.pointerUp(pointer(buttonOf(button), 0, 0, 0)));
+            if (button == BUTTON_LEFT && released == hovered && released.clickable()) {
+                safely(released, () -> released.activate(this));
+            }
+            updateHover();
+            dirty.set(true);
+        }
+    }
+
+    /**
+     * A key went down ({@code repeat}: is held). {@code key} is a GLFW key code with letters already mapped to the
+     * keyboard layout. Returns whether anything used it.
+     */
+    boolean key(int key, int mods, boolean repeat) {
+        resetBlink();
+        hideTooltip();
+        dirty.set(true); // the key may have changed state that lambdas read
+        Overlay top = topOverlay();
+        if (key == KEY_TAB) {
+            moveFocus((mods & MOD_SHIFT) != 0 ? -1 : 1);
+            return true;
+        }
+        boolean[] used = {false};
+        Widget target = focused;
+        if (target != null) {
+            safely(target, () -> used[0] = target.keyPressed(key, mods, this));
+        }
+        if (!used[0] && top != null) {
+            if (key == KEY_ESCAPE) {
+                safely(top, top::escape);
+                if (!top.modal()) {
+                    closeOverlay(top);
+                }
+                used[0] = true;
+            } else if (top.modal()) {
+                safely(top, () -> used[0] = top.keyPressed(key, mods, this));
+            }
+        }
+        if (!used[0] && (top == null || !top.modal())) {
+            used[0] = shortcuts.test(new KeyPress(key, mods, repeat), focused);
+        }
+        return used[0];
+    }
+
+    /** A character was typed. */
+    void typed(int codePoint) {
+        resetBlink();
+        Widget target = focused;
+        if (target != null) {
+            safely(target, () -> target.typed(codePoint, this));
+        }
+        dirty.set(true);
+    }
+
+    /** Mouse wheel or touchpad, in wheel steps (positive: up/left). Returns whether anything scrolled. */
+    boolean scroll(double dx, double dy) {
+        hideTooltip();
+        Pointer at = pointer(Pointer.Button.NONE, 0, 0, 0);
+        for (Widget w = hovered; w != null; w = w.parent) { // the widget under the mouse first, then its parents
+            Widget candidate = w;
+            boolean[] used = {false};
+            safely(candidate, () -> used[0] = candidate.scrolled(at, dx, dy));
+            if (used[0]) {
+                dirty.set(true);
+                return true;
+            }
+        }
+        Overlay top = topOverlay();
+        if (top != null) {
+            if (top.contains(at.x(), at.y()) && top.scrolled(at, dx, dy)) {
+                dirty.set(true);
+                return true;
+            }
+            return false; // the page doesn't scroll away under an open popup or dialog
+        }
+        if (screen != null && screen.scrollBy(at.x(), at.y(), dy)) {
+            dirty.set(true);
+            return true;
+        }
+        return false;
+    }
+
+    /** Files were dropped onto the window at the pointer. */
+    void dropped(List<java.nio.file.Path> files) {
+        if (files.isEmpty() || screen == null || modalOverlay() != null) {
+            return;
+        }
+        Pointer at = pointer(Pointer.Button.NONE, 0, 0, 0);
+        List<java.nio.file.Path> dropped = List.copyOf(files);
+        for (Widget w = screen.widgetAt(at.x(), at.y()); w != null; w = w.parent) { // the widget under the mouse, then outwards
+            Widget candidate = w;
+            boolean[] used = {false};
+            safely(candidate, () -> used[0] = candidate.onDrop(at, dropped));
+            if (used[0]) {
+                break;
+            }
+        }
+        dirty.set(true);
+    }
+
+    // ---- touch ----
+
+    /** Pixels (logical) a finger may move before a press becomes a scroll. */
+    private static final float TOUCH_SLOP = 8;
+    /** Logical pixels per wheel step, as {@link Screen} scrolls. */
+    private static final float PIXELS_PER_STEP = 48;
+    private static final double FLING_FRICTION = 4;
+    private static final double FLING_MIN_SPEED = 30;
+
+    private boolean touching;
+    private boolean touchScrolling;
+    private double touchStartX;
+    private double touchStartY;
+    private double touchLastX;
+    private double touchLastY;
+    private double touchLastTime;
+    /** Finger speed in logical pixels per second, smoothed. */
+    private double touchSpeedX;
+    private double touchSpeedY;
+    private double flingSpeedX;
+    private double flingSpeedY;
+    private double flingTime;
+
+    /** A finger touched the screen at (x, y), window coordinates. */
+    void touchDown(double x, double y) {
+        flingSpeedX = flingSpeedY = 0;
+        touching = true;
+        touchScrolling = false;
+        touchStartX = touchLastX = x;
+        touchStartY = touchLastY = y;
+        touchLastTime = platform.time();
+        touchSpeedX = touchSpeedY = 0;
+        pointerMoved(x, y);
+        pointerButton(BUTTON_LEFT, true);
+    }
+
+    /**
+     * The finger moved. Widgets that handle drags (sliders, custom widgets with {@code onDrag}) get it as a drag;
+     * anywhere else, moving past a few pixels turns the touch into a scroll and the press is let go without a click.
+     */
+    void touchMoved(double x, double y) {
+        if (!touching) {
+            return;
+        }
+        double now = platform.time();
+        double dt = Math.max(1e-3, now - touchLastTime);
+        double alpha = Math.min(1, dt / 0.05);
+        touchSpeedX += ((x - touchLastX) * windowToLogical / dt - touchSpeedX) * alpha;
+        touchSpeedY += ((y - touchLastY) * windowToLogical / dt - touchSpeedY) * alpha;
+        touchLastTime = now;
+        if (!touchScrolling && pressed != null && capturesDrag(pressed)) {
+            touchLastX = x;
+            touchLastY = y;
+            pointerMoved(x, y);
+            return;
+        }
+        if (!touchScrolling) {
+            double distance = Math.hypot(x - touchStartX, y - touchStartY) * windowToLogical;
+            if (distance < TOUCH_SLOP) {
+                return;
+            }
+            touchScrolling = true;
+            cancelPress();
+        }
+        double dx = (x - touchLastX) * windowToLogical;
+        double dy = (y - touchLastY) * windowToLogical;
+        touchLastX = x;
+        touchLastY = y;
+        scroll(dx / PIXELS_PER_STEP, dy / PIXELS_PER_STEP); // the pointer stays where the touch began
+    }
+
+    /** The finger was lifted; {@code cancelled} if the system took the touch away. */
+    void touchUp(double x, double y, boolean cancelled) {
+        if (!touching) {
+            return;
+        }
+        touching = false;
+        if (touchScrolling) {
+            if (!cancelled && Math.hypot(touchSpeedX, touchSpeedY) > FLING_MIN_SPEED * 4) {
+                flingSpeedX = touchSpeedX;
+                flingSpeedY = touchSpeedY;
+                flingTime = platform.time();
+                requestRender();
+                return; // the pointer stays put until the fling ends
+            }
+        } else if (cancelled) {
+            cancelPress();
+        } else {
+            pointerMoved(x, y);
+            pointerButton(BUTTON_LEFT, false);
+        }
+        pointerLeft(); // fingers don't hover
+    }
+
+    /** Keeps a flung list moving, slowing down. Called once per frame. */
+    private void flingStep() {
+        if (flingSpeedX == 0 && flingSpeedY == 0) {
+            return;
+        }
+        double now = platform.time();
+        double dt = Math.min(0.05, now - flingTime);
+        flingTime = now;
+        double decay = Math.exp(-FLING_FRICTION * dt);
+        flingSpeedX *= decay;
+        flingSpeedY *= decay;
+        boolean moved = scroll(flingSpeedX * dt / PIXELS_PER_STEP, flingSpeedY * dt / PIXELS_PER_STEP);
+        if (!moved || Math.hypot(flingSpeedX, flingSpeedY) < FLING_MIN_SPEED) {
+            flingSpeedX = flingSpeedY = 0;
+            if (!touching) {
+                pointerLeft();
+            }
+            return;
+        }
+        frameRequested = true;
+    }
+
+    /** Lets go of the pressed widget without clicking it. */
+    private void cancelPress() {
+        if (pressed == null) {
+            return;
+        }
+        Widget released = pressed;
+        int button = pressedButton;
+        pressed = null;
+        pressedButton = -1;
+        released.pressed = false;
+        safely(released, () -> released.pointerUp(pointer(buttonOf(button), 0, 0, 0)));
+        dirty.set(true);
+    }
+
+    private static final java.util.Map<Class<?>, Boolean> DRAGGABLE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Whether the widget's class (or a superclass below {@link Widget}) handles drags itself. */
+    static boolean capturesDrag(Widget widget) {
+        return DRAGGABLE.computeIfAbsent(widget.getClass(), type -> {
+            for (Class<?> c = type; c != null && c != Widget.class; c = c.getSuperclass()) {
+                try {
+                    c.getDeclaredMethod("onDrag", Pointer.class);
+                    return true;
+                } catch (NoSuchMethodException ignored) {
+                    // keep looking
+                }
+            }
+            return false;
+        });
+    }
+
+    /** Called for keys nobody used: screen, component and app-wide shortcuts. Returns whether one ran. Set by {@link Unweird}. */
+    java.util.function.BiPredicate<KeyPress, Widget> shortcuts = (key, focus) -> false;
 
     /** Focus asked for from code ({@link Widget#focus()}): only widgets that can take it and are reachable now. */
     void requestFocus(Widget widget) {
@@ -708,8 +761,8 @@ final class Window implements Host {
     private void updateHover() {
         Widget target = null;
         if (cursorX >= 0 && cursorY >= 0) {
-            float x = logical(cursorX);
-            float y = logical(cursorY);
+            float x = logicalX(cursorX);
+            float y = logicalY(cursorY);
             Overlay top = topOverlay();
             if (top != null) {
                 target = top.contains(x, y) || top.modal() ? top.hitTest(x, y) : null;
@@ -730,20 +783,20 @@ final class Window implements Host {
         }
         // while dragging (e.g. a text selection), keep the pressed widget's cursor even outside it
         Widget shapeSource = pressed != null ? pressed : hovered;
-        glfwSetCursor(handle, shapeSource == null ? NULL : cursorHandle(shapeSource.cursor()));
+        platform.cursor(shapeSource == null ? null : shapeSource.cursor());
     }
 
     private void armTooltip(Widget target) {
         hideTooltip();
-        if (target == null || target.tooltipText() == null || pressed != null) {
+        if (target == null || target.tooltipText() == null || pressed != null || touching) {
             return;
         }
         tooltipFor = target;
         tooltipTimer = schedule(TOOLTIP_DELAY, () -> {
             if (hovered == target && pressed == null && target.tooltipText() != null) {
                 tooltipShown = true;
-                tooltipX = logical(cursorX);
-                tooltipY = logical(cursorY);
+                tooltipX = logicalX(cursorX);
+                tooltipY = logicalY(cursorY);
             }
         });
     }
@@ -782,51 +835,23 @@ final class Window implements Host {
         canvas.text(text, x + 10, y + 6, size.width(), Canvas.Weight.REGULAR, 13, theme.getBackground(), Canvas.Align.LEFT);
     }
 
-    private long cursorHandle(Cursor cursor) {
-        return cursors.computeIfAbsent(cursor, c -> glfwCreateStandardCursor(switch (c) {
-            case ARROW -> GLFW_ARROW_CURSOR;
-            case HAND -> GLFW_POINTING_HAND_CURSOR;
-            case TEXT -> GLFW_IBEAM_CURSOR;
-            case CROSSHAIR -> GLFW_CROSSHAIR_CURSOR;
-            case MOVE -> GLFW_RESIZE_ALL_CURSOR;
-            case RESIZE_HORIZONTAL -> GLFW_RESIZE_EW_CURSOR;
-            case RESIZE_VERTICAL -> GLFW_RESIZE_NS_CURSOR;
-            case NOT_ALLOWED -> GLFW_NOT_ALLOWED_CURSOR;
-        }));
-    }
-
     private Pointer pointer(Pointer.Button button, int clicks, float dx, float dy) {
-        boolean shift = glfwGetKey(handle, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(handle, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
-        boolean ctrl = glfwGetKey(handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || glfwGetKey(handle, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
-        boolean alt = glfwGetKey(handle, GLFW_KEY_LEFT_ALT) == GLFW_PRESS || glfwGetKey(handle, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
-        return new Pointer(logical(cursorX), logical(cursorY), button, clicks, shift, ctrl, alt, dx, dy);
+        int mods = platform.modifiers();
+        return new Pointer(logicalX(cursorX), logicalY(cursorY), button, clicks,
+                (mods & KeyPress.MOD_SHIFT) != 0, (mods & KeyPress.MOD_CONTROL) != 0, (mods & KeyPress.MOD_ALT) != 0, dx, dy);
     }
 
-    private static Pointer.Button buttonOf(int glfwButton) {
-        return switch (glfwButton) {
-            case GLFW_MOUSE_BUTTON_LEFT -> Pointer.Button.LEFT;
-            case GLFW_MOUSE_BUTTON_RIGHT -> Pointer.Button.RIGHT;
-            case GLFW_MOUSE_BUTTON_MIDDLE -> Pointer.Button.MIDDLE;
+    private static Pointer.Button buttonOf(int button) {
+        return switch (button) {
+            case BUTTON_LEFT -> Pointer.Button.LEFT;
+            case BUTTON_RIGHT -> Pointer.Button.RIGHT;
+            case BUTTON_MIDDLE -> Pointer.Button.MIDDLE;
             default -> Pointer.Button.NONE;
         };
     }
 
-    /** Letter keys as the keyboard layout labels them (Ctrl+Z is the key with Z on it, also on QWERTZ). */
-    private static int layoutKey(int key, int scancode) {
-        if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z) {
-            String name = glfwGetKeyName(key, scancode);
-            if (name != null && name.length() == 1) {
-                char c = Character.toLowerCase(name.charAt(0));
-                if (c >= 'a' && c <= 'z') {
-                    return GLFW_KEY_A + (c - 'a');
-                }
-            }
-        }
-        return key;
-    }
-
     private Overlay topOverlay() {
-        return overlays.isEmpty() ? null : overlays.getLast();
+        return overlays.isEmpty() ? null : overlays.get(overlays.size() - 1);
     }
 
     /** The topmost modal overlay (a dialog), or null. Input below it is blocked. */
@@ -839,17 +864,12 @@ final class Window implements Host {
         return null;
     }
 
-    /** Reads the real cursor position, in case no move event told us yet. */
-    private void syncCursor() {
-        double[] x = new double[1];
-        double[] y = new double[1];
-        glfwGetCursorPos(handle, x, y);
-        cursorX = x[0];
-        cursorY = y[0];
+    private float logicalX(double windowX) {
+        return (float) windowX * windowToLogical - insetLeft;
     }
 
-    private float logical(double windowCoordinate) {
-        return (float) windowCoordinate * windowToLogical;
+    private float logicalY(double windowY) {
+        return (float) windowY * windowToLogical - insetTop;
     }
 
     private void focus(Widget next, boolean viaKeyboard) {
@@ -872,6 +892,9 @@ final class Window implements Host {
             next.focused = true;
             next.focusVisible = viaKeyboard;
             resetBlink();
+        }
+        if (next == null || !next.blinks()) {
+            platform.textInput(false);
         }
         dirty.set(true);
     }
@@ -904,11 +927,11 @@ final class Window implements Host {
         if (focused != null) {
             focused.caretOn = true;
         }
-        nextBlink = glfwGetTime() + BLINK_SECONDS;
+        nextBlink = platform.time() + BLINK_SECONDS;
     }
 
     private void countClicks() {
-        double now = glfwGetTime();
+        double now = platform.time();
         boolean quick = now - lastClickTime < MULTI_CLICK_SECONDS;
         boolean near = Math.abs(cursorX - lastClickX) <= MULTI_CLICK_DISTANCE && Math.abs(cursorY - lastClickY) <= MULTI_CLICK_DISTANCE;
         clickCount = quick && near ? clickCount + 1 : 1;
@@ -941,7 +964,7 @@ final class Window implements Host {
             return;
         }
         while (overlays.size() > index) { // anything opened on top of it goes too
-            Overlay removed = overlays.removeLast();
+            Overlay removed = overlays.remove(overlays.size() - 1);
             if (isInside(hovered, removed)) {
                 hovered.hovered = false;
                 hovered = null;
@@ -975,12 +998,12 @@ final class Window implements Host {
 
     @Override
     public String clipboard() {
-        return glfwGetClipboardString(handle);
+        return platform.clipboard();
     }
 
     @Override
     public void clipboard(String text) {
-        glfwSetClipboardString(handle, text);
+        platform.clipboard(text);
     }
 
     @Override
@@ -995,103 +1018,12 @@ final class Window implements Host {
         }
     }
 
-    /** Turns GLFW's last error into a message that says what's wrong and what to do. */
-    static String explainFailure(int code, String description, boolean creatingWindow) {
-        String details = " (GLFW: " + description + ")";
-        if (!creatingWindow) {
-            return "unweird: there's no display to open a window on" + details
-                    + ". Is DISPLAY (X11) or WAYLAND_DISPLAY set? Over SSH or in a container there may be none.";
-        }
-        String lower = description.toLowerCase(java.util.Locale.ROOT);
-        boolean noLibrary = code == GLFW_API_UNAVAILABLE || lower.contains("failed to load") || lower.contains("glx") && lower.contains("load");
-        if (noLibrary) {
-            return "unweird: couldn't load OpenGL" + details + ". The graphics driver's libGL wasn't found. "
-                    + "On NixOS this happens with a JDK from the Nix store: use a regular JDK (it runs through nix-ld), "
-                    + "start with LD_LIBRARY_PATH=/run/current-system/sw/share/nix-ld/lib (if nix-ld is enabled), "
-                    + "or use a dev shell that provides libGL.";
-        }
-        if (code == GLFW_VERSION_UNAVAILABLE) {
-            return "unweird: the graphics driver doesn't offer OpenGL 3.3" + details
-                    + ". Update the driver; in a virtual machine, turn on 3D acceleration.";
-        }
-        return "unweird: couldn't create a window" + details;
-    }
-
-    private void rememberNormalBounds() {
-        if (glfwGetWindowAttrib(handle, GLFW_MAXIMIZED) == GLFW_TRUE || glfwGetWindowAttrib(handle, GLFW_ICONIFIED) == GLFW_TRUE) {
-            return;
-        }
-        int[] x = new int[1], y = new int[1], w = new int[1], h = new int[1];
-        glfwGetWindowPos(handle, x, y);
-        glfwGetWindowSize(handle, w, h);
-        normalX = x[0];
-        normalY = y[0];
-        normalWidth = w[0];
-        normalHeight = h[0];
-    }
-
-    /** Whether the saved window's top-left area is on a monitor that's connected now. */
-    private static boolean onSomeMonitor(WindowBounds bounds) {
-        var monitors = glfwGetMonitors();
-        if (monitors == null) {
-            return false;
-        }
-        for (int i = 0; i < monitors.limit(); i++) {
-            int[] x = new int[1], y = new int[1], w = new int[1], h = new int[1];
-            glfwGetMonitorWorkarea(monitors.get(i), x, y, w, h);
-            int probeX = bounds.x() + 40;
-            int probeY = bounds.y() + 20;
-            if (probeX >= x[0] && probeY >= y[0] && probeX < x[0] + w[0] && probeY < y[0] + h[0]) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void setIcon(String resource) {
-        try (InputStream in = Window.class.getResourceAsStream(resource.startsWith("/") ? resource : "/" + resource)) {
-            java.awt.image.BufferedImage image = in == null ? null : javax.imageio.ImageIO.read(in);
-            if (image == null) {
-                System.err.println("unweird: can't load window icon " + resource);
-                return;
-            }
-            int w = image.getWidth();
-            int h = image.getHeight();
-            int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
-            ByteBuffer pixels = MemoryUtil.memAlloc(w * h * 4);
-            try (org.lwjgl.glfw.GLFWImage.Buffer images = org.lwjgl.glfw.GLFWImage.malloc(1)) {
-                for (int pixel : argb) {
-                    pixels.put((byte) (pixel >> 16)).put((byte) (pixel >> 8)).put((byte) pixel).put((byte) (pixel >>> 24));
-                }
-                pixels.flip();
-                images.get(0).set(w, h, pixels);
-                glfwSetWindowIcon(handle, images);
-            } finally {
-                MemoryUtil.memFree(pixels);
-            }
-        } catch (IOException e) {
-            System.err.println("unweird: can't load window icon " + resource + ": " + e.getMessage());
-        }
-    }
-
-    private void centerOnPrimaryMonitor() {
-        long monitor = glfwGetPrimaryMonitor();
-        GLFWVidMode mode = monitor == NULL ? null : glfwGetVideoMode(monitor);
-        if (mode == null) {
-            return;
-        }
-        int[] w = new int[1], h = new int[1];
-        glfwGetWindowSize(handle, w, h);
-        glfwSetWindowPos(handle, (mode.width() - w[0]) / 2, (mode.height() - h[0]) / 2);
-    }
-
-    private static ByteBuffer loadResource(String path) {
+    static byte[] loadResource(String path) {
         try (InputStream in = Window.class.getResourceAsStream(path)) {
             if (in == null) {
                 throw new IllegalStateException("unweird: missing resource " + path);
             }
-            byte[] bytes = in.readAllBytes();
-            return MemoryUtil.memAlloc(bytes.length).put(bytes).flip();
+            return in.readAllBytes();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
