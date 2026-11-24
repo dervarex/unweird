@@ -67,13 +67,24 @@ public abstract class Game extends Screen {
     private int surfaceHeight;
     private int cameraPixelX;
     private int cameraPixelY;
+    /** Top-left of the area the game was last drawn in, logical pixels. */
+    private float areaX;
+    private float areaY;
 
     protected Game() {
-        whileShown(() -> lastTime = -1, () -> {
-            if (music != null) {
-                music.stop();
-            }
-        });
+        whileShown(this::shown, this::hidden);
+    }
+
+    /** On screen (as a screen or in a {@link GameView}). */
+    void shown() {
+        lastTime = -1;
+    }
+
+    /** Off screen: the music stops. */
+    void hidden() {
+        if (music != null) {
+            music.stop();
+        }
     }
 
     @Override
@@ -237,12 +248,21 @@ public abstract class Game extends Screen {
 
     @Override
     protected void draw(Canvas canvas) {
+        render(canvas, getX(), getY(), getWidth(), getHeight());
+        super.draw(canvas); // the widgets on top
+        requestFrame();
+    }
+
+    /** One frame: moves everything, then draws the world into the given area. */
+    void render(Canvas canvas, float x, float y, float width, float height) {
         World running = world();
         double now = canvas.time();
         float dt = lastTime < 0 ? 0 : (float) Math.min(MAX_FRAME, now - lastTime);
         lastTime = now;
         pixelRatio = canvas.getPixelRatio();
-        layoutView(Math.round(getWidth() * pixelRatio), Math.round(getHeight() * pixelRatio));
+        areaX = x;
+        areaY = y;
+        layoutView(Math.round(width * pixelRatio), Math.round(height * pixelRatio));
         if (dt > 0) {
             running.update(dt);
             Hooks.of(getClass()).call(this, "tick");
@@ -253,9 +273,13 @@ public abstract class Game extends Screen {
         } else {
             running.followCamera(0);
         }
-        canvas.gl(this, getX(), getY(), getWidth(), getHeight(), 0, this::render);
-        super.draw(canvas); // the widgets on top
-        requestFrame();
+        canvas.gl(this, x, y, width, height, 0, this::render);
+    }
+
+    /** Aspect ratio of the resolution, height / width. */
+    float aspect() {
+        Resolution resolution = getClass().getAnnotation(Resolution.class);
+        return resolution != null ? (float) resolution.height() / resolution.width() : 180f / 320;
     }
 
     /** Fits the resolution into the surface: whole-number scaling when it's bigger, so pixels stay square. */
@@ -381,11 +405,16 @@ public abstract class Game extends Screen {
 
     @Override
     protected void onPress(Pointer pointer) {
+        press(pointer);
+    }
+
+    /** A click into the game: tells the sprite under the mouse. */
+    void press(Pointer pointer) {
         if (world == null) {
             return;
         }
-        float px = (pointer.x() - getX()) * pixelRatio + cameraPixelX;
-        float py = (surfaceHeight - (pointer.y() - getY()) * pixelRatio) + cameraPixelY;
+        float px = (pointer.x() - areaX) * pixelRatio + cameraPixelX;
+        float py = (surfaceHeight - (pointer.y() - areaY) * pixelRatio) + cameraPixelY;
         Sprite hit = world.spriteAt(px / pixelsPerTile, py / pixelsPerTile);
         if (hit != null) {
             Hooks.of(hit.getClass()).call(hit, "clicked");

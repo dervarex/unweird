@@ -77,13 +77,50 @@ public abstract class Game3D extends Screen {
     private boolean started;
     private Save save;
 
-    protected Game3D() {
-        whileShown(() -> lastTime = -1, () -> {
+    /** Who shows the game: this screen, or a {@link GameView}. Owns the mouse capture. */
+    interface Host {
+        boolean locked();
+
+        void lock();
+
+        void unlock();
+    }
+
+    private Host host = new Host() {
+        @Override
+        public boolean locked() {
+            return pointerLocked();
+        }
+
+        @Override
+        public void lock() {
+            lockPointer();
+        }
+
+        @Override
+        public void unlock() {
             unlockPointer();
-            if (save != null && voxels != null) {
-                save.write(voxels, explorer);
-            }
-        });
+        }
+    };
+
+    protected Game3D() {
+        whileShown(this::shown, this::hidden);
+    }
+
+    void host(Host host) {
+        this.host = host;
+    }
+
+    void shown() {
+        lastTime = -1;
+    }
+
+    /** Off screen: lets go of the mouse and saves a {@link Saved @Saved} world. */
+    void hidden() {
+        host.unlock();
+        if (save != null && voxels != null) {
+            save.write(voxels, explorer);
+        }
     }
 
     @Override
@@ -214,6 +251,13 @@ public abstract class Game3D extends Screen {
 
     @Override
     protected void draw(Canvas canvas) {
+        render(canvas, getX(), getY(), getWidth(), getHeight());
+        super.draw(canvas);
+        requestFrame();
+    }
+
+    /** One frame: moves everything, then draws the world and its HUD into the given area. */
+    void render(Canvas canvas, float areaX, float areaY, float areaWidth, float areaHeight) {
         Voxels world = world();
         double now = canvas.time();
         double dt = lastTime < 0 ? 0 : Math.min(MAX_FRAME, now - lastTime);
@@ -236,13 +280,11 @@ public abstract class Game3D extends Screen {
             double[] eye = explorer.eye();
             camera.position((float) eye[0], (float) eye[1], (float) eye[2]).angles(explorer.yaw, explorer.pitch);
         }
-        canvas.gl(this, getX(), getY(), getWidth(), getHeight(), 0, (width, height) -> {
+        canvas.gl(this, areaX, areaY, areaWidth, areaHeight, 0, (width, height) -> {
             renderer.render(scene, camera, width, height);
             drawHud(width, height);
         });
-        drawLabels(canvas);
-        super.draw(canvas);
-        requestFrame();
+        drawLabels(canvas, areaX, areaY, areaWidth, areaHeight);
     }
 
     private void step(double dt) {
@@ -331,7 +373,7 @@ public abstract class Game3D extends Screen {
             double[] e = explorer.eye();
             target = Raycast.cast(voxels, e[0], e[1], e[2], e[3], e[4], e[5], Explorer.REACH);
         }
-        outline.visible(target != null && pointerLocked());
+        outline.visible(target != null && host.locked());
         if (target != null) {
             outline.position(target.x() + 0.5f, target.y() + 0.5f, target.z() + 0.5f);
         }
@@ -368,8 +410,12 @@ public abstract class Game3D extends Screen {
 
     @Override
     protected void onPress(Pointer pointer) {
-        if (!pointerLocked()) {
-            lockPointer();
+        press(pointer);
+    }
+
+    void press(Pointer pointer) {
+        if (!host.locked()) {
+            host.lock();
             return;
         }
         if (explorer == null || !explorer.placed) {
@@ -428,7 +474,11 @@ public abstract class Game3D extends Screen {
 
     @Override
     protected boolean onMove(Pointer pointer) {
-        if (pointerLocked() && explorer != null) {
+        return move(pointer);
+    }
+
+    boolean move(Pointer pointer) {
+        if (host.locked() && explorer != null) {
             explorer.yaw -= pointer.dx() * TURN;
             explorer.pitch = Math.max(-89, Math.min(89, explorer.pitch - pointer.dy() * TURN));
             return true;
@@ -438,6 +488,10 @@ public abstract class Game3D extends Screen {
 
     @Override
     protected boolean onScroll(Pointer at, double dx, double dy) {
+        return scroll(dy);
+    }
+
+    boolean scroll(double dy) {
         int count = voxels == null ? 0 : voxels.blocks.size();
         if (count == 0 || dy == 0) {
             return false;
@@ -461,7 +515,7 @@ public abstract class Game3D extends Screen {
         if (underwater) {
             hud.rect(0, 0, width, height, 0.1f, 0.25f, 0.6f, 0.45f);
         }
-        if (pointerLocked()) {
+        if (host.locked()) {
             float cx = width / 2f, cy = height / 2f, len = 9 * r, thick = Math.max(1, Math.round(2 * r));
             hud.rect(cx - len - 1, cy - thick / 2 - 1, len * 2 + 2, thick + 2, 0, 0, 0, 0.35f);
             hud.rect(cx - thick / 2 - 1, cy - len - 1, thick + 2, len * 2 + 2, 0, 0, 0, 0.35f);
@@ -489,14 +543,14 @@ public abstract class Game3D extends Screen {
         hud.end();
     }
 
-    private void drawLabels(Canvas canvas) {
-        float cx = getX() + getWidth() / 2;
-        if (!pointerLocked()) {
-            canvas.fillRect(cx - 130, getY() + getHeight() / 2 - 26, 260, 52, 12, new Color(0, 0, 0, 0.45f));
-            canvas.label("Click to play", cx, getY() + getHeight() / 2, Canvas.Weight.SEMIBOLD, 18, Color.WHITE);
+    private void drawLabels(Canvas canvas, float x, float y0, float width, float height) {
+        float cx = x + width / 2;
+        if (!host.locked()) {
+            canvas.fillRect(cx - 130, y0 + height / 2 - 26, 260, 52, 12, new Color(0, 0, 0, 0.45f));
+            canvas.label("Click to play", cx, y0 + height / 2, Canvas.Weight.SEMIBOLD, 18, Color.WHITE);
         } else if (time - selectedAt < 1.5 && !voxels.blocks.isEmpty()) {
             String name = voxels.blocks.get(selected).name();
-            float y = getY() + getHeight() - 14 - 44 - 22;
+            float y = y0 + height - 14 - 44 - 22;
             canvas.label(name, cx + 1, y + 1, Canvas.Weight.SEMIBOLD, 16, new Color(0, 0, 0, 0.6f));
             canvas.label(name, cx, y, Canvas.Weight.SEMIBOLD, 16, Color.WHITE);
         }

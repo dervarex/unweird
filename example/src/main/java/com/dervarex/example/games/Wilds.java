@@ -1,8 +1,8 @@
 package com.dervarex.example.games;
 
 import com.dervarex.example.screens.GamesScreen;
-import com.dervarex.unweird.Button;
 import com.dervarex.unweird.Text;
+import com.dervarex.unweird.annotation.Shortcut;
 import com.dervarex.unweird.game.Beach;
 import com.dervarex.unweird.game.Block;
 import com.dervarex.unweird.game.Bottom;
@@ -45,8 +45,12 @@ public class Wilds extends Game3D {
     Pig piglet = new Pig().near(me);
     Sheep sheep = new Sheep().near(me);
 
-    Text hint = new Text("WASD walk · Space jump · F fly · left click break · right click place · Esc mouse");
-    Button back = new Button("Back").onClick(() -> go(GamesScreen.class));
+    Text hint = new Text("WASD walk · Space jump · F fly · left click break · right click place · Esc twice: back");
+
+    @Shortcut("Escape")
+    void back() {
+        go(GamesScreen.class);
+    }
 
     class Land extends Terrain {
         Hills hills = new Hills();
