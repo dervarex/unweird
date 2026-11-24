@@ -41,3 +41,7 @@ bin/
 .DS_Store
 ### Example app data (installed content etc.) ###
 example/run/
+
+### Android ###
+.cxx/
+local.properties

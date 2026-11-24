@@ -8,8 +8,8 @@ no string IDs, no layout boilerplate, no `bind().map()` chains.
 | | |
 |---|---|
 | Language | Java 21 (compiled with `--release 21`) |
-| Rendering | Own renderer: LWJGL (GLFW window + OpenGL) with NanoVG for shapes and text |
-| Platforms | Linux first, Windows later, macOS nice-to-have |
+| Rendering | Own renderer: NanoVG for shapes and text. Desktop: LWJGL (GLFW window + OpenGL 3.3). Android: NanoVG built with the NDK on OpenGL ES 3 |
+| Platforms | Linux first, Android (UI; 3D later), Windows later, macOS nice-to-have |
 | Getters | Lombok (`@Getter`, `@With`) in the library and in user code — never hand-written |
 | Versions | `gradle/libs.versions.toml` |
 
@@ -21,7 +21,9 @@ no string IDs, no layout boilerplate, no `bind().map()` chains.
 | `unweird-processor` | Compile-time annotation processor (field order + `@Default` index) |
 | `unweird-components` | Ready-made composites (login form, settings panel, …) |
 | `unweird-anim` | Animations & transitions (v2) |
+| `unweird-android` | Android backend: `UnweirdActivity`, touch/IME/back input, NanoVG via JNI |
 | `example` | The login/home demo app |
+| `example-android` | A small phone demo |
 
 More `unweird-*` modules can be added later.
 
@@ -374,6 +376,11 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
   It must be the main thread, which GLFW requires on macOS.
 - All handlers run on the UI thread.
 - Rendering is event-driven: the loop waits on `glfwWaitEvents` and only redraws when something changed.
+- Platforms: `Window` holds everything that isn't system-specific (screens, overlays, focus, input routing, timers,
+  touch scrolling, insets). A backend implements `Platform` (time, wake-up, clipboard, cursor, keyboard) and supplies a
+  `Vg` (the NanoVG calls `Canvas` makes): `GlfwWindow` + `LwjglVg` on desktop, `AndroidWindow` + `AndroidVg` on
+  Android. Key codes and modifier bits are GLFW's everywhere; Android translates its own. On Android the
+  `GLSurfaceView`'s GL thread is the UI thread and input is posted to it.
   Continuous rendering comes with `unweird-anim`.
 - Focus: Tab and Shift+Tab move through focusable widgets (fields, buttons) in declaration order,
   including those inside components. Keyboard focus shows a focus ring; tabbing into a field selects its text.
@@ -403,6 +410,7 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
 | **M6** ✅ | `unweird-install`: generic `Source` → `Installer` (verified downloads, dependencies, archives, honest installed state) + `ContentBrowser`; Modrinth source in the example |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
 | **M7** ✅ | Foundations: custom-widget input API (`Slider` built on it), window options (`Unweird.app(...)`), dialogs, toasts, `async`, timers, `@Shortcut`/`focus()`, tooltips, `maxLines`, field undo, fallback fonts |
+| **Android** | `unweird-android` (branch `android`): core split into platform-neutral `Window` + `Platform`/`Vg` backends; touch scrolling and flings, on-screen keyboard, back gesture as Escape, system-bar insets; 3D (`Canvas.gl` on GLES) next |
 | **3D** ✅ | `unweird-3d` (branch `3d-rendering`): `View3D` in normal layouts, scene graph, meshes/box UV, textures, materials, orbit camera, picking; `Canvas.gl` + `requestFrame` in core; skin viewer and world editor demos |
 
 ## Open points
