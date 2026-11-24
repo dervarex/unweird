@@ -485,7 +485,7 @@ final class Window implements Host {
                 focus(pressed, false);
             }
             if (pressed.blinks()) {
-                platform.textInput(true); // tapped a text field: bring up the on-screen keyboard
+                platform.textInput(true, pressed instanceof Field field && field.isMasked()); // tapped a text field: bring up the on-screen keyboard
             }
             Widget target = pressed;
             int clicks = button == BUTTON_LEFT ? clickCount : 1;
@@ -697,6 +697,10 @@ final class Window implements Host {
         }
         double now = platform.time();
         double dt = Math.min(0.05, now - flingTime);
+        if (dt <= 0) {
+            frameRequested = true; // no time passed yet (the frame right after the finger left)
+            return;
+        }
         flingTime = now;
         double decay = Math.exp(-FLING_FRICTION * dt);
         flingSpeedX *= decay;
@@ -894,7 +898,7 @@ final class Window implements Host {
             resetBlink();
         }
         if (next == null || !next.blinks()) {
-            platform.textInput(false);
+            platform.textInput(false, false);
         }
         dirty.set(true);
     }

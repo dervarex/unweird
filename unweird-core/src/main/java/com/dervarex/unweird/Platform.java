@@ -27,7 +27,10 @@ interface Platform {
     /** Modifier keys held right now, as {@link KeyPress} mod bits. */
     int modifiers();
 
-    /** A text field was tapped (true) or text input ended (false): shows or hides an on-screen keyboard. */
-    default void textInput(boolean active) {
+    /**
+     * A text field was tapped ({@code active}) or text input ended: shows or hides an on-screen keyboard.
+     * {@code masked}: the field is a password field.
+     */
+    default void textInput(boolean active, boolean masked) {
     }
 }

@@ -71,9 +71,9 @@ public final class Unweird {
         }
     }
 
-    /** Whether a window is showing (unweird was started and not closed yet). */
-    static boolean running() {
-        return window != null;
+    /** The screen showing now, or null. UI thread. */
+    static Screen shownScreen() {
+        return current;
     }
 
     /**
