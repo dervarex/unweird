@@ -13,6 +13,9 @@ public final class Scene {
     Color background;
     final Vector3f sunDirection = new Vector3f(-0.4f, -1f, -0.6f).normalize();
     float ambient = 0.55f;
+    Color fog;
+    float fogStart;
+    float fogEnd;
 
     public Scene add(Node... nodes) {
         root.add(nodes);
@@ -53,6 +56,17 @@ public final class Scene {
     /** Direction the light travels, e.g. (0, -1, 0) straight down. */
     public Scene sun(float x, float y, float z) {
         sunDirection.set(x, y, z).normalize();
+        return this;
+    }
+
+    /**
+     * Fades things into {@code color} between {@code start} and {@code end} units from the camera, so the edge of
+     * what's drawn isn't a hard line. Null turns it off.
+     */
+    public Scene fog(Color color, float start, float end) {
+        this.fog = color;
+        this.fogStart = start;
+        this.fogEnd = Math.max(start + 0.001f, end);
         return this;
     }
 

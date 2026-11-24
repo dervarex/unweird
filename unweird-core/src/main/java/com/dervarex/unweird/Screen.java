@@ -34,6 +34,11 @@ public abstract class Screen extends Container {
 
     private static final float SCROLL_STEP = 48;
 
+    /** The window title when there's no {@link com.dervarex.unweird.annotation.Title @Title}; null = just the app name. */
+    protected String title() {
+        return null;
+    }
+
     /** Called every time this screen becomes visible, including the first time. */
     protected void onShow() {
     }
