@@ -59,6 +59,7 @@ level over, jumping on the slime defeats it, and the flag goes to the next level
 | `Player` | You. Arrows or A/D run, Space/Up/W jump, X or Ctrl shoots (with `@Shoots`). The camera follows it. |
 | `Wall` | Solid. `from(..).to(..)` makes one long wall with the picture repeated. |
 | `Platform` | A wall you can jump through from below and stand on. |
+| `Mover` | A platform that goes back and forth and carries you: `new Lift().at(10, 2).travel(0, 4)`. |
 | `Pickup` | Disappears when the player touches it, calls `picked()`. |
 | `Hazard` | Hurts the player: the level starts over (or your `hurt()` decides). |
 | `Enemy` | Walks back and forth, turns at walls and edges. Hurts from the side, defeated by jumping on it or a `Shot`. |
@@ -66,7 +67,12 @@ level over, jumping on the slime defeats it, and the flag goes to the next level
 | `Goal` | The end of the level. After the last level your game's `won()` runs. |
 | `Sprite` | Scenery: drawn, nothing happens. |
 
-Tune them with annotations: `@Speed(9)` (tiles per second), `@Jump(5)` (tiles), `@Shoots(Fireball.class)`.
+Tune them with annotations: `@Speed(9)` (tiles per second), `@Jump(5)` (tiles), `@Shoots(Fireball.class)`,
+`@Lives(3)` (hits before the level starts over; `hero.getLives()` for the HUD).
+
+Any sprite can patrol: `new Saw().at(5, 1).travel(4, 0)` goes 4 tiles right and back, forever.
+
+A game controller works too: stick or d-pad to move, A to jump, X or B to shoot.
 
 ### Your own rules
 
@@ -85,7 +91,7 @@ Add methods with these names to any class; they need no `@Override` or `public`:
 
 Sprites are inner classes, so they see the game's fields: `coins++` just works. For more, a sprite has
 `remove()`, `spawn(new Coin().at(x, y))`, `restart()`, `nextLevel()`, `held("Space")`, `velocity(x, y)`,
-`distanceTo(other)`, `touches(other)` and getters for position, size and speed.
+`travel(x, y)`, `distanceTo(other)`, `touches(other)` and getters for position, size and speed.
 
 ```java
 class Hero extends Player {
@@ -189,12 +195,16 @@ One class per kind of block, one field per class. The fields are also what you c
 | `@Liquid` | half see-through, you swim in it: water, lava |
 | `@Plant` | two crossed pictures you walk through: flowers, tall grass |
 | `@Unbreakable` | can't be broken: the bottom of the world |
+| `@Falls` | falls when there's nothing under it: sand, gravel |
 
 Pictures: `grass_top.png`, `grass_side.png`, `grass_bottom.png`, or `grass.png` for all sides; 16 × 16 works well.
 Without pictures, placeholders follow the name: grass, dirt, stone, cobble, sand, gravel, snow, ice, log, leaves,
 planks, bricks, glass, water, lava, bedrock, coal, iron, gold, diamond, … anything else gets a color of its own.
 
 Optional methods on a block class: `broken()`, `placed()`.
+
+Water fills holes next to it below the sea level and runs down into holes under it, so digging into the sea floor
+floods, but it never runs endlessly across the land.
 
 ### Terrain
 
@@ -234,6 +244,7 @@ Without a terrain the world is empty: build it with `place(x, y, z, block)` in `
 |---|---|
 | `Explorer` | You, in first person (see below). |
 | `Creature` | Wanders around, hops up single blocks, swims. `@Speed(2)`. |
+| `Monster` | A creature that comes after you when close and hurts you (with `@Health`). Three hits and it's gone; `defeated()`. Looks like a standing figure. |
 | `Thing` | Stays where it's put. |
 
 Place them with `.at(x, z)` (on the ground), `.at(x, y, z)` or `.near(other)`. A thing looks like `pig.obj`
@@ -253,13 +264,21 @@ cow, sheep, chicken, wolf, fox, …), other things are boxes. Optional methods: 
 | 1–9, mouse wheel | choose a block from the bar at the bottom |
 | Escape | let go of the mouse |
 
+A game controller: left stick walks, right stick looks, A jumps, Y flies, B goes down, right trigger breaks,
+left trigger places, bumpers choose.
+
 `@Speed` and `@Jump` tune it; `broke(Block block)` and `placed(Block block)` methods react.
+
+- `@Health(20)`: falls and monsters hurt; hearts show above the bar. At zero it starts again where it began (or
+  your `died()` method decides; `hurt()` runs on every hit). `getHealth()`, `hurt(n)`, `respawn()`.
+- `@Inventory`: blocks have to be collected before building: breaking adds one, placing uses one, the bar shows
+  only what you have, with counts. `give(block, 10)` hands some out, `count(block)` tells.
 
 ### The world
 
 - `@ViewDistance(8)`: how far you see, in chunks of 16 blocks (default 6).
 - `@Seed(42)`: the same world every time. Without it, every new world is different.
-- `@Saved`: keeps the world between runs (every changed block, where you were, the seed) in
+- `@Saved`: keeps the world between runs (every changed block, where you were, health, inventory, the seed) in
   `~/.local/share/unweird-game/<game class>/`. Delete the folder for a new world.
 - `@Sky(0x9ccfff)`: sky and fog color.
 - `@DayLength(10)`: days and nights, one day in 10 minutes; `timeOfDay()` and `isNight()` tell where you are.

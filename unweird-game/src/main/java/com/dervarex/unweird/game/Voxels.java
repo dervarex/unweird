@@ -146,6 +146,7 @@ final class Voxels {
         chunk.set(lx, y, lz, id);
         edits.computeIfAbsent(chunk.key(), k -> new ConcurrentHashMap<>()).put(Chunk.index(lx, y, lz), id);
         chunk.dirty = true;
+        settleAround(x, y, z);
         for (int dx = -1; dx <= 1; dx++) { // faces and shadows on the neighbors' side change too
             for (int dz = -1; dz <= 1; dz++) {
                 boolean nearX = dx == 0 || dx < 0 && lx == 0 || dx > 0 && lx == Chunk.SIZE - 1;
@@ -157,6 +158,82 @@ final class Voxels {
             }
         }
         return true;
+    }
+
+    // ---- falling blocks and running water ----
+
+    private static final double SETTLE_STEP = 0.08;
+    /** Places to look at again: something next to them changed. */
+    private java.util.Set<Long> unsettled = new java.util.LinkedHashSet<>();
+    private double settleTimer;
+
+    private void settleAround(int x, int y, int z) {
+        unsettled.add(pack(x, y, z));
+        unsettled.add(pack(x, y + 1, z));
+        unsettled.add(pack(x, y - 1, z));
+        unsettled.add(pack(x + 1, y, z));
+        unsettled.add(pack(x - 1, y, z));
+        unsettled.add(pack(x, y, z + 1));
+        unsettled.add(pack(x, y, z - 1));
+    }
+
+    /**
+     * Every few hundredths of a second: {@link Falls @Falls} blocks drop one block, and air next to a liquid fills
+     * when the liquid is above it or the sea is (so a hole dug into the sea floor floods, but water never runs
+     * endlessly sideways).
+     */
+    void settle(double dt) {
+        settleTimer += dt;
+        while (settleTimer >= SETTLE_STEP && !unsettled.isEmpty()) {
+            settleTimer -= SETTLE_STEP;
+            java.util.Set<Long> now = unsettled;
+            unsettled = new java.util.LinkedHashSet<>();
+            for (long packed : now) {
+                int x = unpackX(packed), y = unpackY(packed), z = unpackZ(packed);
+                Block block = block(x, y, z);
+                if (block != null && block.falls) {
+                    short below = id(x, y - 1, z);
+                    if (below == 0 || below != Mesher.SOLID && (blocks.get(below - 1).liquid || blocks.get(below - 1).plant)) {
+                        set(x, y, z, null);
+                        set(x, y - 1, z, block);
+                    }
+                } else if (block == null && id(x, y, z) == 0) {
+                    Block above = block(x, y + 1, z);
+                    Block liquid = above != null && above.liquid ? above : null;
+                    if (liquid == null && terrain != null && y <= terrain.seaLevel) {
+                        for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                            Block side = block(x + d[0], y, z + d[1]);
+                            if (side != null && side.liquid) {
+                                liquid = side;
+                                break;
+                            }
+                        }
+                    }
+                    if (liquid != null) {
+                        set(x, y, z, liquid);
+                    }
+                }
+            }
+        }
+        if (unsettled.isEmpty()) {
+            settleTimer = 0;
+        }
+    }
+
+    private static long pack(int x, int y, int z) {
+        return ((long) (x & 0x3ffffff) << 38) | ((long) (z & 0x3ffffff) << 12) | (y & 0xfff);
+    }
+
+    private static int unpackX(long p) {
+        return (int) (p >> 38) << 6 >> 6;
+    }
+
+    private static int unpackZ(long p) {
+        return (int) ((p >> 12) & 0x3ffffff) << 6 >> 6;
+    }
+
+    private static int unpackY(long p) {
+        return (int) (p & 0xfff) << 20 >> 20;
     }
 
     // ---- streaming ----

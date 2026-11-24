@@ -85,6 +85,12 @@ if (Keyboard.pressed("Space")) jump();     // went down since the last frame: no
 Names as in `KeyPress` (`"A"`, `"Space"`, `"Left"`, `"F5"`), plus `"Shift"`, `"Ctrl"`, `"Alt"` for either side.
 `Keyboard.held(Pointer.Button.LEFT)` for mouse buttons. Switching to another window lets go of everything.
 
+## Game controllers
+
+`Gamepad.held(Gamepad.Button.A)`, `Gamepad.pressed(...)`, `Gamepad.axis(Gamepad.Axis.LEFT_X)` (sticks -1..1 with a
+small dead zone, triggers 0..1), `Gamepad.connected()`. The first controller counts, in the Xbox layout. It's read
+before every frame, so use it where something draws continuously (games).
+
 ## Focus
 
 ```java

@@ -36,6 +36,9 @@ final class Models {
                     : Material.color(color(name, 0xb0b0b0));
             return new Model(Node.group().add(new Node(mesh, material)), new Node[0]);
         }
+        if (thing instanceof Monster) {
+            return figure(name, thing.body);
+        }
         if (thing instanceof Creature) {
             return animal(name, thing.body);
         }
@@ -74,6 +77,33 @@ final class Models {
         return new Model(root, legs);
     }
 
+    /** A standing figure made of boxes: legs, body, arms held forward, head. */
+    private static Model figure(String name, Body body) {
+        Color skin = color(name, 0x5e9e4a);
+        Color cloth = skin.mix(Color.hex("#2b3a6b"), 0.7f);
+        body.width = 0.6;
+        body.height = 1.8;
+        Node root = Node.group();
+        Node torso = new Node(Mesh.box(0.5f, 0.7f, 0.28f), Material.color(cloth)).position(0, 1.1f, 0);
+        Node head = new Node(Mesh.box(0.46f, 0.46f, 0.46f), Material.color(skin)).position(0, 1.68f, 0);
+        Node eyeLeft = new Node(Mesh.box(0.09f, 0.07f, 0.02f), Material.color(Color.hex("#1b1b25")).unlit()).position(-0.1f, 1.72f, 0.235f);
+        Node eyeRight = new Node(Mesh.box(0.09f, 0.07f, 0.02f), Material.color(Color.hex("#1b1b25")).unlit()).position(0.1f, 1.72f, 0.235f);
+        root.add(torso, head, eyeLeft, eyeRight);
+        for (int side = -1; side <= 1; side += 2) {
+            Node arm = Node.group().position(side * 0.34f, 1.38f, 0);
+            arm.add(new Node(Mesh.box(0.18f, 0.18f, 0.62f), Material.color(skin)).position(0, 0, 0.3f));
+            root.add(arm);
+        }
+        Node[] legs = new Node[2];
+        for (int i = 0; i < 2; i++) {
+            Node hip = Node.group().position(i == 0 ? -0.13f : 0.13f, 0.75f, 0);
+            hip.add(new Node(Mesh.box(0.22f, 0.75f, 0.22f), Material.color(cloth.mix(Color.BLACK, 0.3f))).position(0, -0.375f, 0));
+            legs[i] = hip;
+            root.add(hip);
+        }
+        return new Model(root, legs);
+    }
+
     static Color color(String name, int fallback) {
         String n = name.toLowerCase(Locale.ROOT);
         if (n.contains("pig")) return Color.hex("#f0a3ac");
@@ -83,7 +113,8 @@ final class Models {
         if (n.contains("wolf") || n.contains("dog")) return Color.hex("#9a9aa0");
         if (n.contains("fox")) return Color.hex("#e07a2e");
         if (n.contains("bear")) return Color.hex("#5a3d28");
-        if (n.contains("frog") || n.contains("slime")) return Color.hex("#5cc04a");
+        if (n.contains("frog") || n.contains("slime") || n.contains("zombie")) return Color.hex("#5cc04a");
+        if (n.contains("skeleton") || n.contains("ghost")) return Color.hex("#d8d8d0");
         if (n.contains("chest") || n.contains("crate")) return Color.hex("#a8743c");
         if (fallback >= 0) {
             return new Color(((fallback >> 16) & 255) / 255f, ((fallback >> 8) & 255) / 255f, (fallback & 255) / 255f, 1);

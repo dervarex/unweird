@@ -9,6 +9,7 @@ package com.dervarex.unweird.game;
  * @SeeThrough class Leaves extends Block {}
  * @Liquid class Water extends Block {}
  * @Plant class Flower extends Block {}
+ * @Falls class Sand extends Block {}
  * }</pre>
  *
  * Its look is found by name: {@code grass_top.png}, {@code grass_side.png}, {@code grass_bottom.png}, or
@@ -27,6 +28,7 @@ public class Block {
     final boolean liquid = getClass().isAnnotationPresent(Liquid.class);
     final boolean plant = getClass().isAnnotationPresent(Plant.class);
     final boolean unbreakable = getClass().isAnnotationPresent(Unbreakable.class);
+    final boolean falls = getClass().isAnnotationPresent(Falls.class);
 
     /** Walls you can't walk through. */
     final boolean solid() {

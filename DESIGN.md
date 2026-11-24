@@ -439,7 +439,8 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
 | **M7** ✅ | Foundations: custom-widget input API (`Slider` built on it), window options (`Unweird.app(...)`), dialogs, toasts, `async`, timers, `@Shortcut`/`focus()`, tooltips, `maxLines`, field undo, fallback fonts |
 | **3D** ✅ | `unweird-3d` (branch `3d-rendering`): `View3D` in normal layouts, scene graph, meshes/box UV, textures, materials, orbit camera, picking; `Canvas.gl` + `requestFrame` in core; skin viewer and world editor demos |
 | **Games** ✅ | `unweird-game` (branch `game-module`): 2D games (kinds, levels, placeholders, sounds, `@TopDown`), 3D block worlds (terrain parts, chunks, explorer, creatures, `@Saved`), `GameView`; demos Coin Jump and Wilds |
-| next | Games: health and inventories, falling and flowing blocks, moving platforms, gamepads |
+| **Games 2** ✅ | `Gamepad` in core; `travel(...)` paths, `Mover`, `@Lives`; `@Health`, `Monster`, `@Inventory`, `@Falls`, water filling holes; save format v2 |
+| next | Games: items and crafting, mob spawning at night, flowing lava/water levels, multiplayer |
 
 ## Open points
 

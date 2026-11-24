@@ -56,6 +56,15 @@ public class Sprite implements Cloneable {
     float toX = Float.NaN;
     float toY = Float.NaN;
 
+    /** Path for {@link #travel}: offset, start, 0..1 along the way and back, last step. */
+    float travelX;
+    float travelY;
+    float originX = Float.NaN;
+    float originY;
+    float progress;
+    float movedX;
+    float movedY;
+
     boolean removed;
     World world;
     float animation;
@@ -102,6 +111,18 @@ public class Sprite implements Cloneable {
     public final <S extends Sprite> S velocity(float x, float y) {
         velocityX = x;
         velocityY = y;
+        return (S) this;
+    }
+
+    /**
+     * Moves back and forth forever, from where it's placed by (x, y) tiles and back, slowing down at the ends: a saw
+     * on a track, a patrolling bat. A {@link Mover} carries what stands on it. {@link Speed @Speed} sets how fast
+     * (default 2 tiles per second).
+     */
+    @SuppressWarnings("unchecked")
+    public final <S extends Sprite> S travel(float x, float y) {
+        travelX = x;
+        travelY = y;
         return (S) this;
     }
 
@@ -186,6 +207,31 @@ public class Sprite implements Cloneable {
 
     // ---- internal ----
 
+    final boolean travels() {
+        return travelX != 0 || travelY != 0;
+    }
+
+    /** One step along its {@link #travel} path. */
+    final void advance(float dt) {
+        if (Float.isNaN(originX)) {
+            originX = x;
+            originY = y;
+        }
+        float length = (float) Math.sqrt(travelX * travelX + travelY * travelY);
+        progress = (progress + speed(2) * dt / (2 * length)) % 1;
+        float along = progress < 0.5f ? progress * 2 : 2 - progress * 2; // there and back
+        float eased = (float) (0.5 - Math.cos(along * Math.PI) / 2); // slows down at the ends
+        float nextX = originX + travelX * eased;
+        float nextY = originY + travelY * eased;
+        movedX = nextX - x;
+        movedY = nextY - y;
+        if (movedX != 0) {
+            facing = movedX < 0 ? -1 : 1;
+        }
+        x = nextX;
+        y = nextY;
+    }
+
     final float centerX() {
         return x + width / 2;
     }
@@ -233,6 +279,8 @@ public class Sprite implements Cloneable {
             removed = false;
             onGround = false;
             animation = 0;
+            originX = Float.NaN;
+            progress = 0;
         }
     }
 

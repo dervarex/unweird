@@ -9,6 +9,9 @@ import com.dervarex.unweird.game.Bottom;
 import com.dervarex.unweird.game.Caves;
 import com.dervarex.unweird.game.Creature;
 import com.dervarex.unweird.game.Explorer;
+import com.dervarex.unweird.game.Falls;
+import com.dervarex.unweird.game.Health;
+import com.dervarex.unweird.game.Monster;
 import com.dervarex.unweird.game.Game3D;
 import com.dervarex.unweird.game.Hills;
 import com.dervarex.unweird.game.Liquid;
@@ -44,6 +47,7 @@ public class Wilds extends Game3D {
     Pig pig = new Pig().near(me);
     Pig piglet = new Pig().near(me);
     Sheep sheep = new Sheep().near(me);
+    Zombie zombie = new Zombie().near(me);
 
     Text hint = new Text("WASD walk · Space jump · F fly · left click break · right click place · Esc twice: back");
 
@@ -68,7 +72,7 @@ public class Wilds extends Game3D {
     class Grass extends Block {}
     class Dirt extends Block {}
     class Stone extends Block {}
-    class Sand extends Block {}
+    @Falls class Sand extends Block {}
     class Log extends Block {}
     @SeeThrough class Leaves extends Block {}
     class Planks extends Block {}
@@ -78,7 +82,8 @@ public class Wilds extends Game3D {
     @Liquid class Water extends Block {}
     @Unbreakable class Bedrock extends Block {}
 
-    class Me extends Explorer {}
+    @Health(20) class Me extends Explorer {}
     class Pig extends Creature {}
     class Sheep extends Creature {}
+    class Zombie extends Monster {}
 }
