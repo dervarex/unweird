@@ -25,7 +25,8 @@ public class Player extends Sprite {
     private float coyote;
     private float buffer;
     private boolean jumpWasPressed;
-    private boolean jumpCut;
+    /** Only a jump the player started gets lower when the key is let go early (not a bounce or a push). */
+    private boolean jumpCut = true;
     private boolean shootWasPressed;
     float invulnerable;
 

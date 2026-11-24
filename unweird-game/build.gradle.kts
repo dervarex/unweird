@@ -20,3 +20,7 @@ dependencies {
     annotationProcessor(project(":unweird-processor"))
     testAnnotationProcessor(project(":unweird-processor"))
 }
+
+tasks.withType<Test>().configureEach {
+    systemProperty("java.awt.headless", "true") // placeholders are drawn with Java2D
+}
