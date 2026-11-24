@@ -262,6 +262,7 @@ cow, sheep, chicken, wolf, fox, …), other things are boxes. Optional methods: 
 - `@Saved`: keeps the world between runs (every changed block, where you were, the seed) in
   `~/.local/share/unweird-game/<game class>/`. Delete the folder for a new world.
 - `@Sky(0x9ccfff)`: sky and fog color.
+- `@DayLength(10)`: days and nights, one day in 10 minutes; `timeOfDay()` and `isNight()` tell where you are.
 - On the game: `block(x, y, z)`, `place(x, y, z, block)` (null removes), `spawn(thing)`, `explorer()`, and
   optional `tick()` and `started()` methods.
 

@@ -248,6 +248,14 @@ final class Voxels {
         return true;
     }
 
+    /** Darkens (below 1) or restores (1) every block, for the time of day. */
+    void brightness(float value) {
+        com.dervarex.unweird.style.Color tint = new com.dervarex.unweird.style.Color(value, value, value, 1);
+        solid.tint(tint);
+        cutout.tint(tint);
+        liquid.tint(tint);
+    }
+
     /** Whether the chunk at (x, z) can be seen (generated and meshed). */
     boolean shown(int x, int z) {
         Chunk chunk = chunks.get(Chunk.key(Math.floorDiv(x, Chunk.SIZE), Math.floorDiv(z, Chunk.SIZE)));

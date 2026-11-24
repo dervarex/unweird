@@ -207,7 +207,7 @@ Goal: making a game is as short as making a screen, for 2D and 3D. User docs: `d
 - **Behavior from the base class, not from code.** `Player`, `Wall`, `Platform`, `Pickup`, `Hazard`, `Goal`,
   `Enemy`, `Shot`; `Block` (+ `@SeeThrough`, `@Liquid`, `@Plant`, `@Unbreakable`), `Explorer`, `Creature`, `Thing`.
   Tuning is annotations (`@Speed`, `@Jump`, `@Shoots`, `@TopDown`, `@Resolution`, `@Sky`, `@ViewDistance`, `@Seed`,
-  `@Saved`) or short calls on parts (`new Hills().height(50)`, `new Trees(log, leaves).dense()`).
+  `@Saved`, `@DayLength`) or short calls on parts (`new Hills().height(50)`, `new Trees(log, leaves).dense()`).
 - **Hooks by name** (`tick`, `touch(Coin c)`, `picked`, `hurt`, `clicked`, `started`, `won`, …) are found by
   reflection (`Hooks`), so beginners write `void picked()` without `protected`/`@Override` (an override of a
   protected method with package access wouldn't compile). The most specific `touch(T)` wins; exceptions are printed
@@ -439,7 +439,7 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
 | **M7** ✅ | Foundations: custom-widget input API (`Slider` built on it), window options (`Unweird.app(...)`), dialogs, toasts, `async`, timers, `@Shortcut`/`focus()`, tooltips, `maxLines`, field undo, fallback fonts |
 | **3D** ✅ | `unweird-3d` (branch `3d-rendering`): `View3D` in normal layouts, scene graph, meshes/box UV, textures, materials, orbit camera, picking; `Canvas.gl` + `requestFrame` in core; skin viewer and world editor demos |
 | **Games** ✅ | `unweird-game` (branch `game-module`): 2D games (kinds, levels, placeholders, sounds, `@TopDown`), 3D block worlds (terrain parts, chunks, explorer, creatures, `@Saved`), `GameView`; demos Coin Jump and Wilds |
-| next | Games: day/night, health and inventories, falling and flowing blocks, moving platforms, gamepads |
+| next | Games: health and inventories, falling and flowing blocks, moving platforms, gamepads |
 
 ## Open points
 

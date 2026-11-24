@@ -151,6 +151,21 @@ public abstract class Game3D extends Screen {
         spawned.add(thing);
     }
 
+    /**
+     * The time of day from 0 to 1: 0 is sunrise, 0.25 noon, 0.5 sunset, 0.75 midnight. Always 0.25 without
+     * {@link DayLength @DayLength}.
+     */
+    protected final double timeOfDay() {
+        DayLength day = getClass().getAnnotation(DayLength.class);
+        return day == null ? 0.25 : (time / (day.value() * 60) + 0.1) % 1;
+    }
+
+    /** Whether it's night (see {@link DayLength @DayLength}). */
+    protected final boolean isNight() {
+        double t = timeOfDay();
+        return t > 0.52 && t < 0.98;
+    }
+
     /** The explorer, or null if the game has none. */
     protected final Explorer explorer() {
         world();
@@ -276,6 +291,7 @@ public abstract class Game3D extends Screen {
             Hooks.of(getClass()).call(this, "started");
         }
         aim();
+        daylight();
         if (explorer != null) {
             double[] eye = explorer.eye();
             camera.position((float) eye[0], (float) eye[1], (float) eye[2]).angles(explorer.yaw, explorer.pitch);
@@ -554,6 +570,43 @@ public abstract class Game3D extends Screen {
             canvas.label(name, cx + 1, y + 1, Canvas.Weight.SEMIBOLD, 16, new Color(0, 0, 0, 0.6f));
             canvas.label(name, cx, y, Canvas.Weight.SEMIBOLD, 16, Color.WHITE);
         }
+    }
+
+    private final java.util.Map<Material, Color> originalColors = new java.util.IdentityHashMap<>();
+    private float lastLight = -1;
+
+    /** Sky, fog and everything's brightness follow the time of day. */
+    private void daylight() {
+        if (!getClass().isAnnotationPresent(DayLength.class)) {
+            return;
+        }
+        double sun = Math.sin(timeOfDay() * Math.PI * 2); // 1 at noon, -1 at midnight
+        float light = (float) (0.22 + 0.78 * Math.max(0, Math.min(1, sun * 2.5 + 0.35)));
+        if (Math.abs(light - lastLight) < 0.004) {
+            return;
+        }
+        lastLight = light;
+        Color day = skyColor();
+        Color night = new Color(0.02f, 0.03f, 0.08f, 1);
+        Color sky = night.mix(day, (light - 0.22f) / 0.78f);
+        int radius = voxels.radius;
+        scene.background(sky).fog(sky, radius * Chunk.SIZE * 0.6f, radius * Chunk.SIZE * 0.95f);
+        voxels.brightness(light);
+        for (Thing thing : things) {
+            if (thing.node != null) {
+                for (Node node : thing.node.descendants()) {
+                    Material material = node.material();
+                    if (material != null) {
+                        Color original = originalColors.computeIfAbsent(material, Game3D::colorOf);
+                        material.tint(new Color(original.r() * light, original.g() * light, original.b() * light, original.a()));
+                    }
+                }
+            }
+        }
+    }
+
+    private static Color colorOf(Material material) {
+        return material.getColor();
     }
 
     private Color skyColor() {
