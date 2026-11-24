@@ -431,6 +431,7 @@ final class Window implements Host {
                 // Handle input before every frame. With vsync each frame takes ~16 ms, so an animating screen would
                 // otherwise render back to back and never get to the input (clicks and drags did nothing).
                 glfwPollEvents();
+                Gamepad.poll();
                 frameRequested = false;
                 lastFrameTime = glfwGetTime();
                 render();

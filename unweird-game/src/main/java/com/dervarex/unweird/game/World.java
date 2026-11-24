@@ -179,9 +179,13 @@ final class World {
             indexWalls();
         }
         touchingNow = new HashSet<>();
+        moveMovers(dt);
         for (Sprite sprite : sprites) {
             if (sprite.removed || sprite instanceof Wall) {
                 continue;
+            }
+            if (sprite.travels()) {
+                continue; // follows its path
             }
             sprite.behave(this, dt);
             if (sprite.falls()) {
@@ -197,6 +201,40 @@ final class World {
         touches();
         contacts = touchingNow;
         flush();
+    }
+
+    /** Things on a {@link Sprite#travel} path go first; movers take along what stands on them. */
+    private void moveMovers(float dt) {
+        boolean wallMoved = false;
+        for (Sprite sprite : sprites) {
+            if (sprite.removed || !sprite.travels()) {
+                continue;
+            }
+            float top = sprite.y + sprite.height;
+            sprite.advance(dt);
+            if (!(sprite instanceof Wall)) {
+                continue;
+            }
+            wallMoved = true;
+            if (!(sprite instanceof Mover)) {
+                continue;
+            }
+            for (Sprite rider : sprites) {
+                if (rider == sprite || rider.removed || rider instanceof Wall) {
+                    continue;
+                }
+                float oldX = sprite.x - sprite.movedX;
+                boolean standing = Math.abs(rider.y - top) < 0.05f && rider.velocityY <= 0.01f
+                        && rider.x < oldX + sprite.width && rider.x + rider.width > oldX;
+                if (standing) {
+                    move(rider, sprite.movedX, true);
+                    rider.y = sprite.y + sprite.height; // stays on top, up or down
+                }
+            }
+        }
+        if (wallMoved) {
+            indexWalls();
+        }
     }
 
     private void fellOut(Sprite sprite) {

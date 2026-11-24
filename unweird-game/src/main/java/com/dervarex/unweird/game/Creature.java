@@ -9,6 +9,7 @@ public class Creature extends Thing {
     private double timer;
     private double heading;
     private boolean walking;
+    double stunned;
 
     @Override
     boolean falls() {
@@ -17,6 +18,10 @@ public class Creature extends Thing {
 
     @Override
     void behave(double dt) {
+        if (stunned > 0) { // knocked back: let it fly
+            stunned -= dt;
+            return;
+        }
         timer -= dt;
         if (timer <= 0) {
             java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();

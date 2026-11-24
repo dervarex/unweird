@@ -1,5 +1,7 @@
 package com.dervarex.unweird.game;
 
+import com.dervarex.unweird.Gamepad;
+
 /**
  * You. Arrow keys or A/D run, Space, Up or W jumps (hold for higher jumps), X or Ctrl shoots if it has
  * {@link Shoots @Shoots}. In a {@link TopDown @TopDown} game it walks in all directions instead. The camera follows it.
@@ -29,6 +31,17 @@ public class Player extends Sprite {
     private boolean jumpCut = true;
     private boolean shootWasPressed;
     float invulnerable;
+    /** Hits left before the level starts over, see {@link Lives @Lives}; -1 until it first matters. */
+    private int lives = -1;
+
+    /** How many hits it can still take (see {@link Lives @Lives}). */
+    public final int getLives() {
+        if (lives < 0) {
+            Lives annotation = getClass().getAnnotation(Lives.class);
+            lives = annotation != null ? Math.max(1, annotation.value()) : 1;
+        }
+        return lives;
+    }
 
     @Override
     boolean falls() {
@@ -48,32 +61,41 @@ public class Player extends Sprite {
     @Override
     void behave(World world, float dt) {
         float speed = speed(7);
-        int ix = (held("Right") || held("D") ? 1 : 0) - (held("Left") || held("A") ? 1 : 0);
+        float ix = (held("Right") || held("D") || Gamepad.held(Gamepad.Button.RIGHT) ? 1 : 0)
+                - (held("Left") || held("A") || Gamepad.held(Gamepad.Button.LEFT) ? 1 : 0);
+        if (ix == 0) {
+            ix = Gamepad.axis(Gamepad.Axis.LEFT_X);
+        }
         invulnerable = Math.max(0, invulnerable - dt);
         if (world.topDown) {
-            int iy = (held("Up") || held("W") ? 1 : 0) - (held("Down") || held("S") ? 1 : 0);
-            float length = (float) Math.sqrt(ix * ix + iy * iy);
-            float targetX = length == 0 ? 0 : ix / length * speed;
-            float targetY = length == 0 ? 0 : iy / length * speed;
+            float iy = (held("Up") || held("W") || Gamepad.held(Gamepad.Button.UP) ? 1 : 0)
+                    - (held("Down") || held("S") || Gamepad.held(Gamepad.Button.DOWN) ? 1 : 0);
+            if (iy == 0) {
+                iy = -Gamepad.axis(Gamepad.Axis.LEFT_Y);
+            }
+            float length = (float) Math.min(1, Math.sqrt(ix * ix + iy * iy));
+            float norm = (float) Math.sqrt(ix * ix + iy * iy);
+            float targetX = norm == 0 ? 0 : ix / norm * length * speed;
+            float targetY = norm == 0 ? 0 : iy / norm * length * speed;
             velocityX = approach(velocityX, targetX, speed * 12 * dt);
             velocityY = approach(velocityY, targetY, speed * 12 * dt);
-            if (length > 0) {
-                lookX = ix / length;
-                lookY = iy / length;
+            if (norm > 0) {
+                lookX = ix / norm;
+                lookY = iy / norm;
                 if (ix != 0) {
-                    facing = ix;
+                    facing = ix < 0 ? -1 : 1;
                 }
             }
         } else {
             float acceleration = onGround ? speed * 10 : speed * 6;
             velocityX = approach(velocityX, ix * speed, acceleration * dt);
             if (ix != 0) {
-                facing = ix;
-                lookX = ix;
+                facing = ix < 0 ? -1 : 1;
+                lookX = facing;
                 lookY = 0;
             }
-            boolean jumpHeld = held("Space") || held("Up") || held("W");
-            boolean jumpPressed = pressed("Space") || pressed("Up") || pressed("W");
+            boolean jumpHeld = held("Space") || held("Up") || held("W") || Gamepad.held(Gamepad.Button.A);
+            boolean jumpPressed = pressed("Space") || pressed("Up") || pressed("W") || Gamepad.pressed(Gamepad.Button.A);
             coyote = onGround ? COYOTE : coyote - dt;
             buffer = jumpPressed && !jumpWasPressed ? BUFFER : buffer - dt;
             jumpWasPressed = jumpPressed;
@@ -90,7 +112,7 @@ public class Player extends Sprite {
                 jumpCut = true;
             }
         }
-        boolean shootPressed = pressed("X") || pressed("Ctrl");
+        boolean shootPressed = pressed("X") || pressed("Ctrl") || Gamepad.pressed(Gamepad.Button.X) || Gamepad.pressed(Gamepad.Button.B);
         if (shootPressed && !shootWasPressed) {
             shoot(world);
         }
@@ -124,7 +146,12 @@ public class Player extends Sprite {
         }
         invulnerable = INVULNERABLE;
         Sound.effect(getClass(), Assets.snake(getClass().getSimpleName()) + "_hurt", "hurt");
-        if (!Hooks.of(getClass()).call(this, "hurt")) {
+        if (Hooks.of(getClass()).call(this, "hurt")) {
+            return;
+        }
+        lives = getLives() - 1;
+        if (lives <= 0) {
+            lives = -1; // full again after the restart
             restart();
         }
     }
@@ -132,12 +159,20 @@ public class Player extends Sprite {
     /** Bounces off an enemy it jumped on. */
     void bounce() {
         velocityY = (float) Math.sqrt(2 * GRAVITY * 1.6f);
-        jumpCut = !(held("Space") || held("Up") || held("W"));
+        jumpCut = !(held("Space") || held("Up") || held("W") || Gamepad.held(Gamepad.Button.A));
     }
 
     private float jumpHeight(float fallback) {
         Jump jump = getClass().getAnnotation(Jump.class);
         return jump != null ? jump.value() : fallback;
+    }
+
+    /** Lives are full again when its level starts over. */
+    @Override
+    void reset() {
+        super.reset();
+        lives = -1;
+        invulnerable = 0;
     }
 
     private static boolean pressed(String key) {

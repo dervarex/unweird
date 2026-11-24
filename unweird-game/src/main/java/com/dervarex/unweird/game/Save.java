@@ -17,7 +17,7 @@ import java.util.Map;
  */
 final class Save {
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
 
     private final Path file;
     private final List<Block> blocks;
@@ -25,6 +25,8 @@ final class Save {
     private boolean loaded;
     private double[] explorer;
     private boolean flying;
+    private int health = -1;
+    private final Map<String, Integer> inventory = new HashMap<>();
     private final Map<Long, Map<Integer, String>> edits = new HashMap<>();
 
     Save(Class<?> game, List<Block> blocks) {
@@ -84,6 +86,15 @@ final class Save {
             explorer.pitch = (float) this.explorer[4];
             explorer.flying = flying;
         }
+        if (health > 0) {
+            explorer.hurtTo(health);
+        }
+        for (Block block : blocks) {
+            Integer count = inventory.get(block.getClass().getName());
+            if (count != null) {
+                explorer.give(block, count);
+            }
+        }
     }
 
     void write(Voxels voxels, Explorer explorer) {
@@ -101,6 +112,14 @@ final class Save {
                     out.writeDouble(explorer.yaw);
                     out.writeDouble(explorer.pitch);
                     out.writeBoolean(explorer.flying);
+                }
+                out.writeInt(explorer == null ? -1 : explorer.getMaxHealth() > 0 ? explorer.getHealth() : -1);
+                out.writeInt(explorer == null ? 0 : explorer.inventory.size());
+                if (explorer != null) {
+                    for (var entry : explorer.inventory.entrySet()) {
+                        out.writeUTF(entry.getKey().getClass().getName());
+                        out.writeInt(entry.getValue());
+                    }
                 }
                 List<String> names = new ArrayList<>();
                 names.add("");
@@ -128,7 +147,8 @@ final class Save {
             return;
         }
         try (DataInputStream in = new DataInputStream(new java.io.BufferedInputStream(Files.newInputStream(file)))) {
-            if (in.readInt() != VERSION) {
+            int version = in.readInt();
+            if (version < 1 || version > VERSION) {
                 System.err.println("unweird-game: " + file + " is from another version, starting a new world");
                 return;
             }
@@ -136,6 +156,13 @@ final class Save {
             if (in.readBoolean()) {
                 explorer = new double[]{in.readDouble(), in.readDouble(), in.readDouble(), in.readDouble(), in.readDouble()};
                 flying = in.readBoolean();
+            }
+            if (version >= 2) {
+                health = in.readInt();
+                int kinds = in.readInt();
+                for (int i = 0; i < kinds; i++) {
+                    inventory.put(in.readUTF(), in.readInt());
+                }
             }
             int chunks = in.readInt();
             for (int i = 0; i < chunks; i++) {

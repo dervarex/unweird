@@ -2,6 +2,7 @@ package com.dervarex.unweird.game;
 
 import com.dervarex.unweird.Canvas;
 import com.dervarex.unweird.Cursor;
+import com.dervarex.unweird.Gamepad;
 import com.dervarex.unweird.Keyboard;
 import com.dervarex.unweird.Pointer;
 import com.dervarex.unweird.Screen;
@@ -257,6 +258,11 @@ public abstract class Game3D extends Screen {
         thing.body.y = y;
         thing.body.z = Math.floor(z) + 0.5;
         thing.placed = true;
+        if (thing instanceof Explorer you && Double.isNaN(you.spawnX)) {
+            you.spawnX = thing.body.x;
+            you.spawnY = thing.body.y;
+            you.spawnZ = thing.body.z;
+        }
         if (thing.node != null) {
             thing.node.visible(true);
         }
@@ -304,12 +310,15 @@ public abstract class Game3D extends Screen {
     }
 
     private void step(double dt) {
+        voxels.settle(dt);
         if (explorer != null && explorer.placed) {
+            List<Block> bar = bar();
             for (int digit = 1; digit <= 9; digit++) {
-                if (Keyboard.pressed(String.valueOf(digit)) && digit <= voxels.blocks.size()) {
+                if (Keyboard.pressed(String.valueOf(digit)) && digit <= bar.size()) {
                     select(digit - 1);
                 }
             }
+            controller(dt);
         }
         if (!spawned.isEmpty()) {
             List<Thing> joining = new ArrayList<>(spawned);
@@ -329,6 +338,9 @@ public abstract class Game3D extends Screen {
             }
             thing.behave(dt);
             thing.body.move(voxels, dt, thing.falls());
+            if (thing instanceof Explorer you) {
+                you.landed();
+            }
             if (thing.body.y < -20) {
                 thing.body.y = voxels.ground(Body.floor(thing.body.x), Body.floor(thing.body.z)) + 1; // fell out
                 thing.body.vy = 0;
@@ -389,7 +401,7 @@ public abstract class Game3D extends Screen {
             double[] e = explorer.eye();
             target = Raycast.cast(voxels, e[0], e[1], e[2], e[3], e[4], e[5], Explorer.REACH);
         }
-        outline.visible(target != null && host.locked());
+        outline.visible(target != null && playing());
         if (target != null) {
             outline.position(target.x() + 0.5f, target.y() + 0.5f, target.z() + 0.5f);
         }
@@ -438,15 +450,97 @@ public abstract class Game3D extends Screen {
             return;
         }
         if (pointer.button() == Pointer.Button.LEFT) {
-            Thing thing = thingAimedAt(target != null ? target.distance() : Explorer.REACH);
-            if (thing != null) {
-                Hooks.of(thing.getClass()).call(thing, "clicked");
-            } else if (target != null) {
-                breakBlock(target);
+            use();
+        } else if (pointer.button() == Pointer.Button.RIGHT) {
+            build();
+        }
+    }
+
+    /** Left click / right trigger: hit the thing or break the block in front. */
+    private void use() {
+        Thing thing = thingAimedAt(target != null ? target.distance() : Explorer.REACH);
+        if (thing != null) {
+            if (thing instanceof Monster monster) {
+                monster.hit(explorer);
             }
-        } else if (pointer.button() == Pointer.Button.RIGHT && target != null) {
+            Hooks.of(thing.getClass()).call(thing, "clicked");
+        } else if (target != null) {
+            breakBlock(target);
+        }
+    }
+
+    /** Right click / left trigger: place the chosen block. */
+    private void build() {
+        if (target != null) {
             placeBlock(target);
         }
+    }
+
+    private boolean rightTriggerDown;
+    private boolean leftTriggerDown;
+
+    /** A game controller: right stick looks, triggers break and place, bumpers choose. */
+    private void controller(double dt) {
+        if (!Gamepad.connected()) {
+            return;
+        }
+        explorer.yaw -= (float) (Gamepad.axis(Gamepad.Axis.RIGHT_X) * 170 * dt);
+        explorer.pitch = (float) Math.max(-89, Math.min(89, explorer.pitch - Gamepad.axis(Gamepad.Axis.RIGHT_Y) * 120 * dt));
+        boolean right = Gamepad.axis(Gamepad.Axis.RIGHT_TRIGGER) > 0.5f;
+        boolean left = Gamepad.axis(Gamepad.Axis.LEFT_TRIGGER) > 0.5f;
+        if (right && !rightTriggerDown) {
+            use();
+        }
+        if (left && !leftTriggerDown) {
+            build();
+        }
+        rightTriggerDown = right;
+        leftTriggerDown = left;
+        if (Gamepad.pressed(Gamepad.Button.LEFT_BUMPER)) {
+            scroll(1);
+        }
+        if (Gamepad.pressed(Gamepad.Button.RIGHT_BUMPER)) {
+            scroll(-1);
+        }
+    }
+
+    /** Whether the player is in control: the mouse is captured or a controller is plugged in. */
+    private boolean playing() {
+        return host.locked() || Gamepad.connected();
+    }
+
+    /** The blocks on the bar: all of them, or with {@link Inventory @Inventory} the ones the explorer has. */
+    private List<Block> bar() {
+        if (explorer == null || !explorer.collects()) {
+            return voxels.blocks;
+        }
+        List<Block> owned = new ArrayList<>();
+        for (Block block : voxels.blocks) {
+            if (explorer.count(block) > 0) {
+                owned.add(block);
+            }
+        }
+        return owned;
+    }
+
+    /** The chosen block, or null when the bar is empty. */
+    private Block chosen() {
+        List<Block> bar = bar();
+        if (bar.isEmpty()) {
+            return null;
+        }
+        selected = Math.max(0, Math.min(selected, bar.size() - 1));
+        return bar.get(selected);
+    }
+
+    Explorer explorerOrNull() {
+        return explorer;
+    }
+
+    private double hurtAt = -10;
+
+    void hurtFlash() {
+        hurtAt = time;
     }
 
     private void breakBlock(Raycast.Hit hit) {
@@ -459,16 +553,19 @@ public abstract class Game3D extends Screen {
         if (above != null && above.plant) {
             voxels.set(hit.x(), hit.y() + 1, hit.z(), null); // flowers don't float
         }
+        if (explorer.collects()) {
+            explorer.give(block, 1);
+        }
         Sound.effect(block.getClass(), Assets.snake(block.getClass().getSimpleName()) + "_break", "break");
         Hooks.of(block.getClass()).call(block, "broken");
         Hooks.of(explorer.getClass()).call(explorer, "broke", block);
     }
 
     private void placeBlock(Raycast.Hit hit) {
-        if (voxels.blocks.isEmpty()) {
+        Block block = chosen();
+        if (block == null) {
             return;
         }
-        Block block = voxels.blocks.get(selected);
         int x = hit.frontX(), y = hit.frontY(), z = hit.frontZ();
         Block there = voxels.block(x, y, z);
         if (there != null && !there.liquid && !there.plant) {
@@ -482,6 +579,9 @@ public abstract class Game3D extends Screen {
             }
         }
         if (voxels.set(x, y, z, block)) {
+            if (explorer.collects()) {
+                explorer.give(block, -1);
+            }
             Sound.effect(block.getClass(), Assets.snake(block.getClass().getSimpleName()) + "_place", "place");
             Hooks.of(block.getClass()).call(block, "placed");
             Hooks.of(explorer.getClass()).call(explorer, "placed", block);
@@ -508,7 +608,7 @@ public abstract class Game3D extends Screen {
     }
 
     boolean scroll(double dy) {
-        int count = voxels == null ? 0 : voxels.blocks.size();
+        int count = voxels == null ? 0 : bar().size();
         if (count == 0 || dy == 0) {
             return false;
         }
@@ -531,19 +631,36 @@ public abstract class Game3D extends Screen {
         if (underwater) {
             hud.rect(0, 0, width, height, 0.1f, 0.25f, 0.6f, 0.45f);
         }
-        if (host.locked()) {
+        if (time - hurtAt < 0.35) {
+            hud.rect(0, 0, width, height, 0.8f, 0.05f, 0.05f, (float) (0.35 * (1 - (time - hurtAt) / 0.35)));
+        }
+        if (playing()) {
             float cx = width / 2f, cy = height / 2f, len = 9 * r, thick = Math.max(1, Math.round(2 * r));
             hud.rect(cx - len - 1, cy - thick / 2 - 1, len * 2 + 2, thick + 2, 0, 0, 0, 0.35f);
             hud.rect(cx - thick / 2 - 1, cy - len - 1, thick + 2, len * 2 + 2, 0, 0, 0, 0.35f);
             hud.rect(cx - len, cy - thick / 2, len * 2, thick, 1, 1, 1, 0.9f);
             hud.rect(cx - thick / 2, cy - len, thick, len * 2, 1, 1, 1, 0.9f);
         }
-        List<Block> blocks = voxels.blocks;
+        List<Block> blocks = bar();
+        float slot = 44 * r, gap = 4 * r, pad = 6 * r;
+        if (explorer != null && explorer.getMaxHealth() > 0) {
+            int hearts = (explorer.getMaxHealth() + 1) / 2;
+            float size = 12 * r, space = 3 * r;
+            float hx = (width - hearts * size - (hearts - 1) * space) / 2, hy = 14 * r + slot + 10 * r;
+            for (int i = 0; i < hearts; i++) {
+                int filled = Math.max(0, Math.min(2, explorer.getHealth() - i * 2));
+                float x = hx + i * (size + space);
+                hud.rect(x - r, hy - r, size + 2 * r, size + 2 * r, 0, 0, 0, 0.5f);
+                hud.rect(x, hy, size, size, 0.25f, 0.08f, 0.1f, 1);
+                if (filled > 0) {
+                    hud.rect(x, hy, filled == 2 ? size : size / 2, size, 0.9f, 0.15f, 0.2f, 1);
+                }
+            }
+        }
         if (explorer != null && !blocks.isEmpty()) {
+            selected = Math.max(0, Math.min(selected, blocks.size() - 1));
             int shown = Math.min(10, blocks.size());
-            int first = Math.max(0, Math.min(selected - shown + 1, blocks.size() - shown));
-            first = Math.min(first, selected);
-            float slot = 44 * r, gap = 4 * r, pad = 6 * r;
+            int first = barStart(shown, blocks.size());
             float total = shown * slot + (shown - 1) * gap;
             float x = (width - total) / 2, y = 14 * r;
             for (int i = 0; i < shown; i++) {
@@ -559,14 +676,33 @@ public abstract class Game3D extends Screen {
         hud.end();
     }
 
+    /** The first block shown on the bar, so the chosen one is always visible. */
+    private int barStart(int shown, int size) {
+        int first = Math.max(0, Math.min(selected - shown + 1, size - shown));
+        return Math.min(first, selected);
+    }
+
     private void drawLabels(Canvas canvas, float x, float y0, float width, float height) {
         float cx = x + width / 2;
-        if (!host.locked()) {
+        List<Block> bar = bar();
+        if (explorer != null && explorer.collects() && !bar.isEmpty()) { // how many of each
+            int shown = Math.min(10, bar.size());
+            int first = barStart(shown, bar.size());
+            float total = shown * 44 + (shown - 1) * 4;
+            for (int i = 0; i < shown; i++) {
+                String count = String.valueOf(explorer.count(bar.get(first + i)));
+                float lx = cx - total / 2 + i * 48 + 36;
+                float ly = y0 + height - 14 - 10;
+                canvas.label(count, lx + 1, ly + 1, Canvas.Weight.SEMIBOLD, 13, new Color(0, 0, 0, 0.7f));
+                canvas.label(count, lx, ly, Canvas.Weight.SEMIBOLD, 13, Color.WHITE);
+            }
+        }
+        if (!playing()) {
             canvas.fillRect(cx - 130, y0 + height / 2 - 26, 260, 52, 12, new Color(0, 0, 0, 0.45f));
             canvas.label("Click to play", cx, y0 + height / 2, Canvas.Weight.SEMIBOLD, 18, Color.WHITE);
-        } else if (time - selectedAt < 1.5 && !voxels.blocks.isEmpty()) {
-            String name = voxels.blocks.get(selected).name();
-            float y = y0 + height - 14 - 44 - 22;
+        } else if (time - selectedAt < 1.5 && chosen() != null) {
+            String name = chosen().name();
+            float y = y0 + height - 14 - 44 - 22 - (explorer != null && explorer.getMaxHealth() > 0 ? 22 : 0);
             canvas.label(name, cx + 1, y + 1, Canvas.Weight.SEMIBOLD, 16, new Color(0, 0, 0, 0.6f));
             canvas.label(name, cx, y, Canvas.Weight.SEMIBOLD, 16, Color.WHITE);
         }
