@@ -19,8 +19,12 @@ import java.util.Map;
 
 import static org.lwjgl.opengl.GL33C.*;
 
-/** Draws a {@link Scene} with OpenGL 3.3. One per {@link View3D}; UI thread only. */
-final class Renderer {
+/**
+ * Draws a {@link Scene} with OpenGL 3.3. {@link View3D} uses one; for your own widgets, call {@link #render} inside
+ * {@link com.dervarex.unweird.Canvas#gl Canvas.gl}. One per view (it keeps GPU copies of meshes and textures);
+ * UI thread only.
+ */
+public final class Renderer {
 
     private static final String VERTEX = """
             #version 330 core
@@ -101,7 +105,8 @@ final class Renderer {
     private record Item(Node node, Matrix4f world, float depth) {
     }
 
-    void render(Scene scene, Camera camera, int width, int height) {
+    /** Draws {@code scene} as {@code camera} sees it into the current target of {@code width × height} pixels. */
+    public void render(Scene scene, Camera camera, int width, int height) {
         frame++;
         if (program == 0) {
             setUp();

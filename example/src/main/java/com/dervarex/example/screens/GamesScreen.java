@@ -1,6 +1,7 @@
 package com.dervarex.example.screens;
 
 import com.dervarex.example.games.CoinJump;
+import com.dervarex.example.games.Wilds;
 import com.dervarex.unweird.Button;
 import com.dervarex.unweird.Screen;
 import com.dervarex.unweird.Text;
@@ -13,4 +14,5 @@ public class GamesScreen extends Screen {
     Text subtitle = new Text("Made with unweird-game. Each one is a single short class.");
 
     Button coinJump = new Button("Coin Jump (2D)").onClick(() -> go(CoinJump.class));
+    Button wilds = new Button("Wilds (3D)").onClick(() -> go(Wilds.class));
 }
