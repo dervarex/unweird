@@ -23,6 +23,20 @@ public final class Keyboard {
         return false;
     }
 
+    /**
+     * Whether the key went down since the last frame: for things that happen once per press (jumping, shooting).
+     * Unlike checking {@link #held} each frame, this doesn't miss a tap shorter than a frame.
+     */
+    public static boolean pressed(String key) {
+        String wanted = key.strip();
+        for (int code : Unweird.pressedKeys()) {
+            if (name(code).equalsIgnoreCase(wanted)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether any of the keys is held, e.g. {@code anyHeld("Left", "A")}. */
     public static boolean anyHeld(String... keys) {
         for (String key : keys) {

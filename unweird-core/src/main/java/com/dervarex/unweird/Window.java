@@ -73,6 +73,8 @@ final class Window implements Host {
     final java.util.Set<Integer> heldKeys = new java.util.HashSet<>();
     /** Mouse buttons held down right now (GLFW buttons). UI thread only. */
     final java.util.Set<Integer> heldButtons = new java.util.HashSet<>();
+    /** Keys that went down since the last frame, for {@link Keyboard#pressed}. UI thread only. */
+    final java.util.Set<Integer> pressedKeys = new java.util.HashSet<>();
     /** Open overlays, bottom to top. The top one gets input. */
     private final List<Overlay> overlays = new java.util.ArrayList<>();
     private int pressedButton = -1;
@@ -517,6 +519,7 @@ final class Window implements Host {
         drawTooltip(logicalWidth, logicalHeight);
         nvgEndFrame(vg);
         canvas.collectSurfaces();
+        pressedKeys.clear();
         glfwSwapBuffers(handle);
 
         if (focused != null && !focused.interactive()) {
@@ -642,6 +645,9 @@ final class Window implements Host {
                 return;
             }
             heldKeys.add(code);
+            if (action == GLFW_PRESS) {
+                pressedKeys.add(code);
+            }
             if (code == GLFW_KEY_ESCAPE && pointerLock != null) {
                 unlockPointer(pointerLock); // Escape always gives the mouse back
                 dirty.set(true);

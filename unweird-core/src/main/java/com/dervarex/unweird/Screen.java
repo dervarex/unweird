@@ -39,6 +39,14 @@ public abstract class Screen extends Container {
         return null;
     }
 
+    /**
+     * Lays the widgets out along the top edge over the full width, without a card or scrolling: for screens that draw
+     * their own full-window content (games) with a few widgets on top. Off by default.
+     */
+    protected boolean overlay() {
+        return false;
+    }
+
     /** Called every time this screen becomes visible, including the first time. */
     protected void onShow() {
     }

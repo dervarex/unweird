@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":unweird-components"))
     implementation(project(":unweird-install"))
     implementation(project(":unweird-3d"))
+    implementation(project(":unweird-game"))
     implementation(libs.gson) // for the Modrinth source
 
     compileOnly(libs.lombok)

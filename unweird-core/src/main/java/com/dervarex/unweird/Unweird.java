@@ -165,6 +165,11 @@ public final class Unweird {
         return current == null ? java.util.Set.of() : current.heldKeys;
     }
 
+    static java.util.Set<Integer> pressedKeys() {
+        Window current = window;
+        return current == null ? java.util.Set.of() : current.pressedKeys;
+    }
+
     static java.util.Set<Integer> heldButtons() {
         Window current = window;
         return current == null ? java.util.Set.of() : current.heldButtons;

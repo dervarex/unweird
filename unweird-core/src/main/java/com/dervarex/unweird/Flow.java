@@ -38,6 +38,7 @@ final class Flow {
     private static final float CARD_CONTENT_WIDTH = 360;
     private static final float CARD_PADDING = 32;
     private static final float OUTER_MARGIN = 24;
+    private static final float OVERLAY_MARGIN = 16;
     private static final float PAGE_WIDTH = 640;
     private static final float PAGE_TOP = 40;
     private static final float PAGE_BOTTOM = 40;
@@ -63,6 +64,15 @@ final class Flow {
         screen.contentY = areaY;
         screen.contentWidth = areaWidth;
         screen.contentHeight = areaHeight;
+
+        if (screen.overlay()) {
+            screen.flowMode = Mode.PAGE;
+            screen.scrollMax = 0;
+            screen.scrollY = 0;
+            float width = Math.max(0, areaWidth - OVERLAY_MARGIN * 2);
+            column(screen, canvas, width, true, areaX + OVERLAY_MARGIN, areaY + OVERLAY_MARGIN);
+            return;
+        }
 
         if (formLike(screen)) {
             float cardWidth = Math.min(CARD_CONTENT_WIDTH + CARD_PADDING * 2, areaWidth - OUTER_MARGIN * 2);
