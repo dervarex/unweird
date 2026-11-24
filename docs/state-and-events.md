@@ -73,6 +73,18 @@ Unweird.shortcut("Ctrl+Q", Unweird::quit);    // app-wide, before start
 - Letters follow the keyboard layout: Ctrl+Z is the key with Z on it, on QWERTZ too.
 - On macOS, `Ctrl` also means Cmd.
 
+## Keys held down
+
+For things that move while a key is held (games, a canvas you pan with the arrows), ask the keyboard directly:
+
+```java
+if (Keyboard.held("Left")) x -= speed * dt;
+if (Keyboard.pressed("Space")) jump();     // went down since the last frame: no tap is missed
+```
+
+Names as in `KeyPress` (`"A"`, `"Space"`, `"Left"`, `"F5"`), plus `"Shift"`, `"Ctrl"`, `"Alt"` for either side.
+`Keyboard.held(Pointer.Button.LEFT)` for mouse buttons. Switching to another window lets go of everything.
+
 ## Focus
 
 ```java

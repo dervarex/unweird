@@ -19,7 +19,10 @@ Java UI library with its own renderer (LWJGL: GLFW + OpenGL 3.3 + NanoVG). Gradl
 - `unweird-components` — ready-made components (`LoginForm`)
 - `unweird-install` — generic `Source` → `Installer` → `ContentBrowser`; nothing catalog-specific belongs here
 - `unweird-3d` — `View3D`, scene graph, renderer; built on `Canvas.gl` + `requestFrame` from core
-- `example` — demo app; Modrinth source, skin viewer, world editor live here (app-specific code, not library)
+- `unweird-game` — games: `Game` (2D sprites/levels, `World` physics, `Batch` GL sprites) and `Game3D` (block
+  worlds: `Terrain` parts, `Voxels` chunk streaming, `Mesher`, `Explorer`); hooks found by name (`Hooks`), art and
+  sounds by class/field name (`Assets`) with placeholders/synth fallbacks. One package so internals stay package-private
+- `example` — demo app; Modrinth source, skin viewer, world editor, demo games live here (app-specific code, not library)
 
 Docs for users: `docs/`. Design decisions and roadmap: `DESIGN.md`. Keep both current when behavior changes.
 

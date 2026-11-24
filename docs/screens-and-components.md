@@ -82,7 +82,7 @@ That's it, no registering. It shows up docked on every screen. Sides: `LEFT`, `R
 
 - Left/right take the full height, top/bottom span the rest.
 - In a sidebar, buttons look like navigation items. In a header, texts go left and buttons right.
-- Hide them on a screen with `@Without(Sidebar.class)` (several allowed).
+- Hide them on a screen with `@Without(Sidebar.class)` (several allowed), or all of them with just `@Without`.
 - There's only one instance of each. Get it anywhere with `shared(Sidebar.class)`.
 
 That last one is also how screens share data:

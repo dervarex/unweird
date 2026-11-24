@@ -38,6 +38,8 @@ card, in the order you declared them.
 - **Installing content** (`unweird-install`) — search a catalog, install with verified downloads and dependencies,
   and an installed state that never lies
 - **3D** (`unweird-3d`) — 3D views inside normal layouts: scene graph, textures, orbit camera, picking
+- **Games** (`unweird-game`) — 2D platformers and top-down games, endless 3D block worlds with terrain, caves,
+  trees and creatures; behavior comes from what a class extends, pictures and sounds from its name
 - **Custom widgets** — public hooks for mouse, keyboard, scroll and file drops; raw OpenGL via `Canvas.gl(...)`
 
 ## Requirements
@@ -67,6 +69,7 @@ dependencies {
     implementation("com.github.dervarex.unweird:unweird-components:v0.1.2")
     implementation("com.github.dervarex.unweird:unweird-install:v0.1.2")
     implementation("com.github.dervarex.unweird:unweird-3d:v0.1.2")
+    implementation("com.github.dervarex.unweird:unweird-game:v0.1.2")
 }
 ```
 
@@ -87,6 +90,7 @@ dependencies {
     implementation 'com.github.dervarex.unweird:unweird-components:v0.1.2'
     implementation 'com.github.dervarex.unweird:unweird-install:v0.1.2'
     implementation 'com.github.dervarex.unweird:unweird-3d:v0.1.2'
+    implementation 'com.github.dervarex.unweird:unweird-game:v0.1.2'
 }
 ```
 
