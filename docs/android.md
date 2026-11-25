@@ -22,6 +22,8 @@ That's the whole Android-specific code. `LoginScreen` and everything it leads to
 | Hover, tooltips | None (no pointer). With a mouse plugged in (Chromebooks, desktop mode) hover works like on desktop |
 | Logical pixels | Density-independent pixels (dp), so sizes match other apps |
 | `Unweird.open(url)` | Opens the link in the browser (or the app that handles it) |
+| 3D (`View3D`), `Canvas.gl` | Same, on OpenGL ES 3. Drag turns the camera; there's no pinch-to-zoom yet. Raw GL code must use `Gl` (see [Your own widgets](custom-widgets.md)) |
+| Images, textures | PNG and JPEG as on desktop, plus whatever Android decodes (WebP, HEIF). `BufferedImage` doesn't exist: use `Pixels` |
 | Window size, icon, `remember()` | Don't apply. The app's icon and name come from the manifest |
 
 The status and navigation bars are drawn over by the theme's background, and their icons turn dark or light with
@@ -29,12 +31,13 @@ the theme. Screens are laid out in the space between them.
 
 ## Setting up an app
 
-Android apps are built by the Android Gradle plugin. A minimal app module:
+Android apps are built by the Android Gradle plugin. With unweird's Gradle plugin, a minimal app module is:
 
 ```kotlin
 // build.gradle.kts
 plugins {
     id("com.android.application")
+    id("com.dervarex.unweird")
 }
 
 android {
@@ -45,28 +48,43 @@ android {
         applicationId = "com.example.notes"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
     }
+}
+```
 
+The plugin adds `unweird-android` and the annotation processor, keeps LWJGL (the desktop backend) out, sets Java 21
+and tells Android to combine unweird's index files (`META-INF/unweird/**`) instead of failing on duplicates.
+`unweird { threeD = true }` adds 3D. See [Getting started](getting-started.md) for where the plugin comes from.
+
+<details><summary>Without the plugin</summary>
+
+```kotlin
+android {
+    // ...
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-
     packaging {
         resources {
-            // every module adds its own unweird index; they're combined, not one picked
             merges += "META-INF/unweird/**"
         }
     }
 }
 
+// LWJGL is unweird's desktop backend; Android draws with its own.
+configurations.configureEach {
+    exclude(group = "org.lwjgl")
+}
+
 dependencies {
     implementation(project(":unweird-android"))
+    implementation(project(":unweird-3d"))          // optional: 3D views work on Android too
     annotationProcessor(project(":unweird-processor"))
 }
 ```
+
+</details>
 
 ```xml
 <!-- src/main/AndroidManifest.xml -->
@@ -90,8 +108,8 @@ dependencies {
 Keep the `configChanges` line: with it, rotating the phone lays the screen out again. Without it, Android
 recreates the activity and the app starts over at the first screen.
 
-The `merges` line is needed because each module (unweird itself and your app) records its widget field order in a
-file with the same name. Without it the build fails with `2 files found with path 'META-INF/unweird/fields.idx'`.
+Without the plugin's packaging rule the build fails with `2 files found with path 'META-INF/unweird/fields.idx'`:
+each module (unweird itself and your app) records its widget field order in a file with that name.
 
 `unweird-android` isn't on JitPack yet. Until it is, include unweird as a build next to your app
 (`includeBuild("../unweird")` in your settings file) and use the project dependencies shown above.
@@ -126,6 +144,5 @@ Without Nix, install Android Studio (or the command-line tools) and set `ANDROID
 
 ## Not there yet
 
-- `Canvas.gl`, and with it `unweird-3d`: a 3D view stays empty on Android for now.
 - More than one finger (pinch to zoom), long-press menus, text selection handles.
 - Dropping files onto the window (`onDrop`).

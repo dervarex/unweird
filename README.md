@@ -199,6 +199,7 @@ The Android demo needs an Android SDK; `nix develop .#android` sets one up (see 
 | `unweird-install` | Browse catalogs and install content from any source |
 | `unweird-3d` | 3D views: scene graph, meshes, textures, camera, picking |
 | `unweird-android` | Android backend: run the same screens on phones |
+| `unweird-gradle-plugin` | `id("com.dervarex.unweird")`: dependencies, processor and platform setup in one line |
 | `example` | The demo app |
 | `example-android` | A small Android demo |
 | `intellij-plugin` | IntelliJ IDEA plugin: New Project wizard, file and live templates, inspections (separate build) |

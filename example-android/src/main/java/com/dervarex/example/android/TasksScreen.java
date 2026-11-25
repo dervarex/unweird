@@ -31,6 +31,7 @@ public class TasksScreen extends Screen {
     Button clear  = new Button("Clear all…").secondary().onClick(this::clear);
     Button settings = new Button("Settings").secondary().onClick(() -> go(SettingsScreen.class));
     Button about  = new Button("About").secondary().rightOf(settings).onClick(() -> go(AboutScreen.class));
+    Button cubes  = new Button("3D").secondary().rightOf(about).onClick(() -> go(CubesScreen.class));
 
     private void add() {
         if (!task.value().isBlank()) {

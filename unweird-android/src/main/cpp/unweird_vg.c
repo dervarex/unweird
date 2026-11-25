@@ -212,3 +212,9 @@ JNIEXPORT jintArray FN(nImageSize)(JNIEnv* env, jclass c, jlong ctx, jint image)
 JNIEXPORT void FN(nDeleteImage)(JNIEnv* env, jclass c, jlong ctx, jint image) {
     nvgDeleteImage(CTX, image);
 }
+
+/** An OpenGL texture (premultiplied, bottom row first) as a NanoVG image; the caller keeps owning the texture. */
+JNIEXPORT jint FN(nImageFromTexture)(JNIEnv* env, jclass c, jlong ctx, jint texture, jint width, jint height) {
+    return nvglCreateImageFromHandleGLES3(CTX, (GLuint) texture, width, height,
+                                          NVG_IMAGE_NODELETE | NVG_IMAGE_FLIPY | NVG_IMAGE_PREMULTIPLIED);
+}

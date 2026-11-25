@@ -23,6 +23,8 @@ Java UI library with its own renderer (LWJGL: GLFW + OpenGL 3.3 + NanoVG). Gradl
   only in the build when an Android SDK is found. `nix develop .#android` provides one. `example-android` is its demo
 - `intellij-plugin` — IntelliJ plugin (Kotlin, separate Gradle build: `./gradlew -p intellij-plugin test`). Its
   inspections mirror library rules (`ShortcutSyntax` ↔ `KeyPress.Shortcut.parse`): keep them in step
+- `unweird-gradle-plugin` — `com.dervarex.unweird` plugin (plain Java, `java-gradle-plugin`); talks to the Android
+  plugin by reflection so it doesn't depend on a particular AGP version
 - `example` — demo app; Modrinth source, skin viewer, world editor live here (app-specific code, not library)
 
 Docs for users: `docs/`. Design decisions and roadmap: `DESIGN.md`. Keep both current when behavior changes.
@@ -38,11 +40,13 @@ Docs for users: `docs/`. Design decisions and roadmap: `DESIGN.md`. Keep both cu
   the defaults call the public hooks (`onKey`, `onPress`...) for custom widgets. Keep both working.
 - **Fluent setters are overridden covariantly** in every widget (`below`, `rightOf`, `gap`, `visibleIf`,
   `enabledIf`, `tooltip`...). A new widget, or a new relation method on `Widget`, needs these overrides.
-- **GL state**: code inside `Canvas.gl` may change anything; `GlSurface` restores what NanoVG needs.
+- **GL state**: code inside `Canvas.gl` may change anything; `GlSurface` restores what NanoVG needs. Library GL code
+  goes through `Gl` (`canvas.openGl()`), never LWJGL's `GL33C`, so it runs on Android too.
 - Package-private on purpose: the layout, docking, overlays and window internals are not public API.
 - **Platforms**: `Window` is platform-neutral; GLFW lives only in `GlfwWindow`/`LwjglVg`. Core code outside those must
   not touch LWJGL classes (GLFW key constants are fine: they're inlined at compile time). Avoid Java APIs Android
-  lacks (`List.getFirst`, virtual threads without a fallback, `java.awt`).
+  lacks (`List.getFirst`, virtual threads without a fallback, `java.awt`, `java.net.http`). Public methods must not
+  overload on AWT types: javac on Android then can't resolve the call at all (`Pixels` exists for that).
 
 ## API style (the owner cares about this)
 

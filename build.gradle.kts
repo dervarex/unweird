@@ -51,7 +51,8 @@ configure(javaModules) {
 }
 
 // Library modules are published (JitPack builds them from a git tag); the example app isn't.
-configure(javaModules.filter { it.name != "example" }) {
+// The Gradle plugin publishes itself (java-gradle-plugin).
+configure(javaModules.filter { it.name != "example" && it.name != "unweird-gradle-plugin" }) {
     apply(plugin = "maven-publish")
 
     extensions.configure<JavaPluginExtension> {
