@@ -1,4 +1,11 @@
 jdk:
   - openjdk21
+before_install:
+  # The Android SDK's CMake needs a newer glibc than some JitPack images have; Kitware's and Ninja's own Linux builds
+  # run on old ones. unweird-android's native code (NanoVG) is built with these instead.
+  - curl -sSL https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-x86_64.tar.gz | tar xz -C "$HOME"
+  - curl -sSL -o "$HOME/ninja.zip" https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
+  - unzip -o -q "$HOME/ninja.zip" -d "$HOME/cmake-3.31.6-linux-x86_64/bin"
+  - echo "cmake.dir=$HOME/cmake-3.31.6-linux-x86_64" >> local.properties
 install:
   - ./gradlew publishToMavenLocal -x test --console=plain
