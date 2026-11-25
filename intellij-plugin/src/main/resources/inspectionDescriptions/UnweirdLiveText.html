@@ -1,0 +1,6 @@
+<html><body>
+Reports widget texts that are computed once from a value that changes:
+<pre><code>Text greeting = new Text("Hi " + name);       // keeps showing the first name
+Text greeting = new Text(() -&gt; "Hi " + name); // unweird re-reads it after every event</code></pre>
+<p>The quick fix turns the text into a lambda.</p>
+</body></html>

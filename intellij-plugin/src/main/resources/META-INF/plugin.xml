@@ -1,0 +1,50 @@
+<idea-plugin>
+    <id>com.dervarex.unweird</id>
+    <name>unweird</name>
+    <vendor url="https://github.com/dervarex/unweird">dervarex</vendor>
+    <description><![CDATA[
+    Tools for <a href="https://github.com/dervarex/unweird">unweird</a>, a Java UI library for desktop and Android:
+    <ul>
+      <li><b>New Project wizard</b>: a ready-to-run desktop app, Android app, or both sharing their screens</li>
+      <li><b>New → unweird Class</b>: screens, components, dialogs and custom widgets</li>
+      <li><b>Live templates</b>: <code>uwbutton</code>, <code>uwtext</code>, <code>uwlive</code>, <code>uwfield</code>,
+          <code>uwtoggle</code>, <code>uwstate</code>, <code>uwshortcut</code>, <code>uwgo</code></li>
+      <li><b>Inspections</b> for mistakes that otherwise only show at runtime: misspelled shortcuts, texts that don't
+          update, screens unweird can't create, a missing annotation processor</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.java</depends>
+    <depends>com.intellij.gradle</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <newProjectWizard.generator implementation="com.dervarex.unweird.intellij.UnweirdProjectWizard"/>
+
+        <internalFileTemplate name="unweird Screen"/>
+        <internalFileTemplate name="unweird Component"/>
+        <internalFileTemplate name="unweird Dialog"/>
+        <internalFileTemplate name="unweird Widget"/>
+
+        <defaultLiveTemplates file="/liveTemplates/unweird.xml"/>
+
+        <localInspection language="JAVA" shortName="UnweirdShortcut" displayName="Misspelled unweird shortcut"
+                         groupName="unweird" enabledByDefault="true" level="ERROR"
+                         implementationClass="com.dervarex.unweird.intellij.ShortcutInspection"/>
+        <localInspection language="JAVA" shortName="UnweirdLiveText" displayName="unweird text that won't update"
+                         groupName="unweird" enabledByDefault="true" level="WARNING"
+                         implementationClass="com.dervarex.unweird.intellij.LiveTextInspection"/>
+        <localInspection language="JAVA" shortName="UnweirdConstructor" displayName="Screen unweird can't create"
+                         groupName="unweird" enabledByDefault="true" level="ERROR"
+                         implementationClass="com.dervarex.unweird.intellij.ConstructorInspection"/>
+        <localInspection language="JAVA" shortName="UnweirdProcessor" displayName="unweird annotation processor missing"
+                         groupName="unweird" enabledByDefault="true" level="WARNING"
+                         implementationClass="com.dervarex.unweird.intellij.ProcessorInspection"/>
+    </extensions>
+
+    <actions>
+        <action id="Unweird.NewClass" class="com.dervarex.unweird.intellij.NewUnweirdClassAction"
+                text="unweird Class" description="A screen, component, dialog or widget" icon="/icons/unweird.svg">
+            <add-to-group group-id="NewGroup" anchor="after" relative-to-action="NewClass"/>
+        </action>
+    </actions>
+</idea-plugin>

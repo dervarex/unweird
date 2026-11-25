@@ -1,0 +1,41 @@
+<templateSet group="unweird">
+  <template name="uwtext" value="com.dervarex.unweird.Text $NAME$ = new com.dervarex.unweird.Text(&quot;$TEXT$&quot;);$END$" description="unweird: a Text field" toReformat="true" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;heading&quot;" alwaysStopAt="true" />
+    <variable name="TEXT" expression="" defaultValue="" alwaysStopAt="true" />
+    <context><option name="JAVA_DECLARATION" value="true" /></context>
+  </template>
+  <template name="uwlive" value="com.dervarex.unweird.Text $NAME$ = new com.dervarex.unweird.Text(() -&gt; $VALUE$);$END$" description="unweird: a Text that follows a value" toReformat="true" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;status&quot;" alwaysStopAt="true" />
+    <variable name="VALUE" expression="" defaultValue="" alwaysStopAt="true" />
+    <context><option name="JAVA_DECLARATION" value="true" /></context>
+  </template>
+  <template name="uwbutton" value="com.dervarex.unweird.Button $NAME$ = new com.dervarex.unweird.Button(&quot;$LABEL$&quot;).onClick(() -&gt; $END$);" description="unweird: a Button with a click handler" toReformat="true" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;save&quot;" alwaysStopAt="true" />
+    <variable name="LABEL" expression="" defaultValue="&quot;Save&quot;" alwaysStopAt="true" />
+    <context><option name="JAVA_DECLARATION" value="true" /></context>
+  </template>
+  <template name="uwfield" value="com.dervarex.unweird.Field $NAME$ = new com.dervarex.unweird.Field(&quot;$PLACEHOLDER$&quot;);$END$" description="unweird: a text Field" toReformat="true" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <variable name="PLACEHOLDER" expression="" defaultValue="&quot;Name&quot;" alwaysStopAt="true" />
+    <context><option name="JAVA_DECLARATION" value="true" /></context>
+  </template>
+  <template name="uwtoggle" value="com.dervarex.unweird.Toggle $NAME$ = new com.dervarex.unweird.Toggle(&quot;$LABEL$&quot;).onChange(on -&gt; $END$);" description="unweird: a Toggle" toReformat="true" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;dark&quot;" alwaysStopAt="true" />
+    <variable name="LABEL" expression="" defaultValue="&quot;Dark mode&quot;" alwaysStopAt="true" />
+    <context><option name="JAVA_DECLARATION" value="true" /></context>
+  </template>
+  <template name="uwstate" value="@com.dervarex.unweird.annotation.State $TYPE$ $NAME$;$END$" description="unweird: state the UI reads (refreshes after changes)" toReformat="true" toShortenFQNames="true">
+    <variable name="TYPE" expression="" defaultValue="&quot;int&quot;" alwaysStopAt="true" />
+    <variable name="NAME" expression="" defaultValue="&quot;count&quot;" alwaysStopAt="true" />
+    <context><option name="JAVA_DECLARATION" value="true" /></context>
+  </template>
+  <template name="uwshortcut" value="@com.dervarex.unweird.annotation.Shortcut(&quot;$KEYS$&quot;)&#10;void $NAME$() {&#10;    $END$&#10;}" description="unweird: a keyboard shortcut method" toReformat="true" toShortenFQNames="true">
+    <variable name="KEYS" expression="" defaultValue="&quot;Ctrl+S&quot;" alwaysStopAt="true" />
+    <variable name="NAME" expression="" defaultValue="&quot;save&quot;" alwaysStopAt="true" />
+    <context><option name="JAVA_DECLARATION" value="true" /></context>
+  </template>
+  <template name="uwgo" value="go($SCREEN$.class);" description="unweird: show another screen" toReformat="true" toShortenFQNames="true">
+    <variable name="SCREEN" expression="" defaultValue="&quot;HomeScreen&quot;" alwaysStopAt="true" />
+    <context><option name="JAVA_STATEMENT" value="true" /><option name="JAVA_EXPRESSION" value="true" /></context>
+  </template>
+</templateSet>

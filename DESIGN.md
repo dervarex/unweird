@@ -24,6 +24,7 @@ no string IDs, no layout boilerplate, no `bind().map()` chains.
 | `unweird-android` | Android backend: `UnweirdActivity`, touch/IME/back input, NanoVG via JNI |
 | `example` | The login/home demo app |
 | `example-android` | A small phone demo |
+| `intellij-plugin` | IntelliJ plugin (separate build): New Project wizard, New unweird Class, live templates, inspections |
 
 More `unweird-*` modules can be added later.
 

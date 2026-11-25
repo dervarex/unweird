@@ -1,0 +1,13 @@
+#if (${PACKAGE_NAME} && ${PACKAGE_NAME} != "")package ${PACKAGE_NAME};#end
+
+import com.dervarex.unweird.Button;
+import com.dervarex.unweird.Screen;
+import com.dervarex.unweird.Text;
+import com.dervarex.unweird.annotation.Title;
+
+@Title("${NAME}")
+public class ${NAME} extends Screen {
+
+    Text heading = new Text("${NAME}");
+    Button back  = new Button("Back").secondary().onClick(() -> { /* go(HomeScreen.class); */ });
+}

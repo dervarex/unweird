@@ -42,6 +42,8 @@ bin/
 ### Example app data (installed content etc.) ###
 example/run/
 
+.intellijPlatform/
+
 ### Android ###
 .cxx/
 local.properties
