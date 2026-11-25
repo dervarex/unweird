@@ -14,6 +14,7 @@ include(
     "unweird-components",
     "unweird-install",
     "unweird-3d",
+    "unweird-gradle-plugin",
     "example",
 )
 

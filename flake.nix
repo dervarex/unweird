@@ -14,7 +14,7 @@
       # Keep these in step with unweird-android/build.gradle.kts (compileSdk, buildToolsVersion, ndkVersion, cmake).
       android = pkgs.androidenv.composeAndroidPackages {
         platformVersions = [ "36" ];
-        buildToolsVersions = [ "36.1.0" ];
+        buildToolsVersions = [ "36.1.0" "36.0.0" ]; # 36.0.0: what the Android Gradle plugin picks by default
         includeNDK = true;
         ndkVersions = [ "29.0.14206865" ];
         cmakeVersions = [ "3.31.6" ];

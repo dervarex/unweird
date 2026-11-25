@@ -22,6 +22,7 @@ no string IDs, no layout boilerplate, no `bind().map()` chains.
 | `unweird-components` | Ready-made composites (login form, settings panel, …) |
 | `unweird-anim` | Animations & transitions (v2) |
 | `unweird-android` | Android backend: `UnweirdActivity`, touch/IME/back input, NanoVG via JNI |
+| `unweird-gradle-plugin` | `com.dervarex.unweird`: adds modules + processor; desktop natives per OS; Android packaging, Java 21, no LWJGL |
 | `example` | The login/home demo app |
 | `example-android` | A small phone demo |
 

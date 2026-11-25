@@ -31,12 +31,13 @@ the theme. Screens are laid out in the space between them.
 
 ## Setting up an app
 
-Android apps are built by the Android Gradle plugin. A minimal app module:
+Android apps are built by the Android Gradle plugin. With unweird's Gradle plugin, a minimal app module is:
 
 ```kotlin
 // build.gradle.kts
 plugins {
     id("com.android.application")
+    id("com.dervarex.unweird")
 }
 
 android {
@@ -47,18 +48,25 @@ android {
         applicationId = "com.example.notes"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
     }
+}
+```
 
+The plugin adds `unweird-android` and the annotation processor, keeps LWJGL (the desktop backend) out, sets Java 21
+and tells Android to combine unweird's index files (`META-INF/unweird/**`) instead of failing on duplicates.
+`unweird { threeD = true }` adds 3D. See [Getting started](getting-started.md) for where the plugin comes from.
+
+<details><summary>Without the plugin</summary>
+
+```kotlin
+android {
+    // ...
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-
     packaging {
         resources {
-            // every module adds its own unweird index; they're combined, not one picked
             merges += "META-INF/unweird/**"
         }
     }
@@ -75,6 +83,8 @@ dependencies {
     annotationProcessor(project(":unweird-processor"))
 }
 ```
+
+</details>
 
 ```xml
 <!-- src/main/AndroidManifest.xml -->
@@ -98,8 +108,8 @@ dependencies {
 Keep the `configChanges` line: with it, rotating the phone lays the screen out again. Without it, Android
 recreates the activity and the app starts over at the first screen.
 
-The `merges` line is needed because each module (unweird itself and your app) records its widget field order in a
-file with the same name. Without it the build fails with `2 files found with path 'META-INF/unweird/fields.idx'`.
+Without the plugin's packaging rule the build fails with `2 files found with path 'META-INF/unweird/fields.idx'`:
+each module (unweird itself and your app) records its widget field order in a file with that name.
 
 `unweird-android` isn't on JitPack yet. Until it is, include unweird as a build next to your app
 (`includeBuild("../unweird")` in your settings file) and use the project dependencies shown above.
