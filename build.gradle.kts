@@ -1,3 +1,19 @@
+buildscript {
+    // The Android Gradle plugin, only when the Android modules are part of the build (same check as settings.gradle.kts).
+    val localProperties = rootDir.resolve("local.properties")
+    val androidSdk = System.getenv("ANDROID_HOME") != null || System.getenv("ANDROID_SDK_ROOT") != null
+            || localProperties.exists() && localProperties.readLines().any { it.trim().startsWith("sdk.dir") }
+    if (androidSdk) {
+        repositories {
+            google()
+            mavenCentral()
+        }
+        dependencies {
+            classpath("com.android.tools.build:gradle:${libs.versions.agp.get()}")
+        }
+    }
+}
+
 plugins {
     java
 }
@@ -7,11 +23,15 @@ allprojects {
     version = "0.1.0-SNAPSHOT"
 
     repositories {
+        google()
         mavenCentral()
     }
 }
 
-subprojects {
+/** Plain Java modules; the Android ones are built by the Android Gradle plugin. */
+val javaModules = subprojects.filter { !it.name.endsWith("android") }
+
+configure(javaModules) {
     apply(plugin = "java")
 
     tasks.withType<JavaCompile>().configureEach {
@@ -31,7 +51,7 @@ subprojects {
 }
 
 // Library modules are published (JitPack builds them from a git tag); the example app isn't.
-configure(subprojects.filter { it.name != "example" }) {
+configure(javaModules.filter { it.name != "example" }) {
     apply(plugin = "maven-publish")
 
     extensions.configure<JavaPluginExtension> {
@@ -60,7 +80,7 @@ configure(subprojects.filter { it.name != "example" }) {
 
 // Gradle module metadata can't express the LWJGL "natives-linux" classifier dependencies and silently drops them,
 // so consumers would compile fine and then crash at startup. Publish only the POM, which keeps them.
-subprojects {
+configure(javaModules) {
     tasks.withType<GenerateModuleMetadata>().configureEach {
         enabled = false
     }
@@ -68,7 +88,7 @@ subprojects {
 
 // The sources jar must match the bytecode: modules using Lombok publish "delomboked" sources (with the generated
 // getters written out), otherwise IDEs report "library source does not match the bytecode".
-configure(subprojects.filter { it.name != "example" }) {
+configure(javaModules.filter { it.name != "example" }) {
     afterEvaluate {
         val compileClasspath = configurations.getByName("compileClasspath")
         if (compileClasspath.allDependencies.none { it.group == "org.projectlombok" }) {

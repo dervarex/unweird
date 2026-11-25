@@ -24,7 +24,20 @@ import java.util.function.Consumer;
  */
 public final class Async<T> {
 
-    private static final Executor WORKERS = Executors.newVirtualThreadPerTaskExecutor();
+    private static final Executor WORKERS = workers();
+
+    /** Virtual threads where the runtime has them; Android doesn't, so plain daemon threads there. */
+    private static Executor workers() {
+        try {
+            return Executors.newVirtualThreadPerTaskExecutor();
+        } catch (LinkageError | UnsupportedOperationException e) {
+            return Executors.newCachedThreadPool(work -> {
+                Thread thread = new Thread(work, "unweird-async");
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+    }
 
     private final CompletableFuture<T> future;
     private volatile Consumer<? super T> done;

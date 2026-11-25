@@ -5,12 +5,6 @@ import com.dervarex.unweird.style.Theme;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
-import org.lwjgl.nanovg.NVGColor;
-import org.lwjgl.nanovg.NVGGlyphPosition;
-import org.lwjgl.nanovg.NVGPaint;
-import org.lwjgl.system.MemoryUtil;
-
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -18,8 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-
-import static org.lwjgl.nanovg.NanoVG.*;
 
 /**
  * What widgets draw on. Wraps the renderer so widget code never touches NanoVG directly.
@@ -34,14 +26,10 @@ public final class Canvas {
     private static final float LINE_HEIGHT = 1.35f;
     private static final float UNBOUNDED = 1_000_000f;
 
-    private final long vg;
+    private final Vg vg;
     private final int regularFont;
     private final int semiboldFont;
 
-    private final NVGColor color = NVGColor.malloc();
-    private final NVGColor color2 = NVGColor.malloc();
-    private final NVGPaint paint = NVGPaint.malloc();
-    private final float[] bounds = new float[4];
     /** Loaded images by source; -1 marks a source that failed to load (reported once). */
     private final Map<String, Integer> images = new HashMap<>();
 
@@ -71,7 +59,11 @@ public final class Canvas {
         return time;
     }
 
-    Canvas(long vg, int regularFont, int semiboldFont, Theme theme) {
+    Vg vg() {
+        return vg;
+    }
+
+    Canvas(Vg vg, int regularFont, int semiboldFont, Theme theme) {
         this.vg = vg;
         this.regularFont = regularFont;
         this.semiboldFont = semiboldFont;
@@ -79,33 +71,33 @@ public final class Canvas {
     }
 
     public void fillRect(float x, float y, float width, float height, float radius, Color fill) {
-        nvgBeginPath(vg);
-        nvgRoundedRect(vg, x, y, width, height, radius);
-        nvgFillColor(vg, nvg(fill, color));
-        nvgFill(vg);
+        vg.beginPath();
+        vg.roundedRect(x, y, width, height, radius);
+        fillColor(fill);
+        vg.fill();
     }
 
     /** Draws an outline fully inside the given rectangle. */
     public void strokeRect(float x, float y, float width, float height, float radius, float strokeWidth, Color stroke) {
         float half = strokeWidth / 2;
-        nvgBeginPath(vg);
-        nvgRoundedRect(vg, x + half, y + half, width - strokeWidth, height - strokeWidth, Math.max(0, radius - half));
-        nvgStrokeWidth(vg, strokeWidth);
-        nvgStrokeColor(vg, nvg(stroke, color));
-        nvgStroke(vg);
+        vg.beginPath();
+        vg.roundedRect(x + half, y + half, width - strokeWidth, height - strokeWidth, Math.max(0, radius - half));
+        vg.strokeWidth(strokeWidth);
+        vg.strokeColor(stroke.r(), stroke.g(), stroke.b(), stroke.a());
+        vg.stroke();
     }
 
     /** A soft drop shadow around (and slightly below) the given rectangle. */
     public void shadow(float x, float y, float width, float height, float radius, float blur, Color shade) {
         float offsetY = blur / 4;
-        nvgBoxGradient(vg, x, y + offsetY, width, height, radius, blur,
-                nvg(shade, color), nvg(Color.TRANSPARENT, color2), paint);
-        nvgBeginPath(vg);
-        nvgRect(vg, x - blur, y - blur + offsetY, width + blur * 2, height + blur * 2);
-        nvgRoundedRect(vg, x, y, width, height, radius);
-        nvgPathWinding(vg, NVG_HOLE);
-        nvgFillPaint(vg, paint);
-        nvgFill(vg);
+        Color clear = Color.TRANSPARENT;
+        vg.boxGradient(x, y + offsetY, width, height, radius, blur,
+                shade.r(), shade.g(), shade.b(), shade.a(), clear.r(), clear.g(), clear.b(), clear.a());
+        vg.beginPath();
+        vg.rect(x - blur, y - blur + offsetY, width + blur * 2, height + blur * 2);
+        vg.roundedRect(x, y, width, height, radius);
+        vg.hole();
+        vg.fill();
     }
 
     /** Size of {@code text} wrapped at {@code maxWidth}. */
@@ -126,8 +118,8 @@ public final class Canvas {
 
     /** Width of {@code text} on a single line. */
     public float textWidth(String text, Weight weight, float size) {
-        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-        return (float) Math.ceil(nvgTextBounds(vg, 0, 0, text, bounds));
+        font(weight, size, Vg.ALIGN_LEFT | Vg.ALIGN_TOP);
+        return (float) Math.ceil(advance(text));
     }
 
     /** Draws {@code text} with its top-left at (x, y), wrapped at {@code width} and aligned within it. */
@@ -141,8 +133,8 @@ public final class Canvas {
             return;
         }
         List<Line> lines = lines(text, weight, size, width <= 0 ? UNBOUNDED : width, maxLines);
-        font(weight, size, nvgAlign(align) | NVG_ALIGN_TOP);
-        nvgFillColor(vg, nvg(fill, color));
+        font(weight, size, vgAlign(align) | Vg.ALIGN_TOP);
+        fillColor(fill);
         float lineHeight = size * LINE_HEIGHT;
         float anchorX = switch (align) {
             case LEFT -> x;
@@ -150,7 +142,7 @@ public final class Canvas {
             case RIGHT -> x + width;
         };
         for (int i = 0; i < lines.size(); i++) {
-            nvgText(vg, anchorX, y + i * lineHeight, lines.get(i).text());
+            vg.text(anchorX, y + i * lineHeight, lines.get(i).text());
         }
     }
 
@@ -176,7 +168,7 @@ public final class Canvas {
         if (cached != null) {
             return cached;
         }
-        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        font(weight, size, Vg.ALIGN_LEFT | Vg.ALIGN_TOP);
         float limit = Math.max(1, maxWidth);
         List<String> out = new ArrayList<>();
         for (String paragraph : text.split("\n", -1)) {
@@ -239,14 +231,14 @@ public final class Canvas {
     }
 
     private float advance(String text) {
-        return text.isEmpty() ? 0 : nvgTextBounds(vg, 0, 0, text, bounds);
+        return text.isEmpty() ? 0 : vg.textAdvance(text);
     }
 
     /** Draws a single line of text centered on (centerX, centerY). */
     public void label(String text, float centerX, float centerY, Weight weight, float size, Color fill) {
-        font(weight, size, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-        nvgFillColor(vg, nvg(fill, color));
-        nvgText(vg, centerX, centerY, text);
+        font(weight, size, Vg.ALIGN_CENTER | Vg.ALIGN_MIDDLE);
+        fillColor(fill);
+        vg.text(centerX, centerY, text);
     }
 
     /** Draws a single line of text starting at {@code x}, vertically centered on {@code centerY}. */
@@ -254,9 +246,9 @@ public final class Canvas {
         if (text.isEmpty()) {
             return;
         }
-        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-        nvgFillColor(vg, nvg(fill, color));
-        nvgText(vg, x, centerY, text);
+        font(weight, size, Vg.ALIGN_LEFT | Vg.ALIGN_MIDDLE);
+        fillColor(fill);
+        vg.text(x, centerY, text);
     }
 
     /** Height of one line of text at the given size. */
@@ -274,7 +266,7 @@ public final class Canvas {
         if (text.isEmpty()) {
             return xs;
         }
-        font(weight, size, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        font(weight, size, Vg.ALIGN_LEFT | Vg.ALIGN_TOP);
 
         byte[] utf8 = text.getBytes(StandardCharsets.UTF_8);
         int[] charAtByte = new int[utf8.length + 1];
@@ -288,41 +280,35 @@ public final class Canvas {
         charAtByte[utf8.length] = text.length();
 
         Arrays.fill(xs, Float.NaN);
-        ByteBuffer buffer = MemoryUtil.memAlloc(utf8.length);
-        NVGGlyphPosition.Buffer glyphs = NVGGlyphPosition.malloc(text.codePointCount(0, text.length()));
-        try {
-            buffer.put(utf8).flip();
-            long start = MemoryUtil.memAddress(buffer);
-            int count = nvgTextGlyphPositions(vg, 0, 0, buffer, glyphs);
-            float end = 0;
-            for (int g = 0; g < count; g++) {
-                NVGGlyphPosition glyph = glyphs.get(g);
-                int index = charAtByte[(int) (glyph.str() - start)];
-                if (Float.isNaN(xs[index])) {
-                    xs[index] = glyph.x();
-                }
-                end = Math.max(end, glyph.maxx());
+        int glyphCount = text.codePointCount(0, text.length());
+        int[] offsets = new int[glyphCount];
+        float[] glyphXs = new float[glyphCount];
+        float[] glyphEnds = new float[glyphCount];
+        int count = vg.glyphPositions(utf8, offsets, glyphXs, glyphEnds);
+        float end = 0;
+        for (int g = 0; g < count; g++) {
+            int index = charAtByte[offsets[g]];
+            if (Float.isNaN(xs[index])) {
+                xs[index] = glyphXs[g];
             }
-            xs[0] = Float.isNaN(xs[0]) ? 0 : xs[0];
-            xs[text.length()] = end;
-            for (int i = 1; i < text.length(); i++) {
-                if (Float.isNaN(xs[i])) {
-                    xs[i] = xs[i - 1]; // second half of a surrogate pair, or a character without a glyph
-                }
+            end = Math.max(end, glyphEnds[g]);
+        }
+        xs[0] = Float.isNaN(xs[0]) ? 0 : xs[0];
+        xs[text.length()] = end;
+        for (int i = 1; i < text.length(); i++) {
+            if (Float.isNaN(xs[i])) {
+                xs[i] = xs[i - 1]; // second half of a surrogate pair, or a character without a glyph
             }
-        } finally {
-            glyphs.free();
-            MemoryUtil.memFree(buffer);
         }
         return xs;
     }
 
     /** A filled circle. */
     public void circle(float centerX, float centerY, float radius, Color fill) {
-        nvgBeginPath(vg);
-        nvgCircle(vg, centerX, centerY, radius);
-        nvgFillColor(vg, nvg(fill, color));
-        nvgFill(vg);
+        vg.beginPath();
+        vg.circle(centerX, centerY, radius);
+        fillColor(fill);
+        vg.fill();
     }
 
     /** An open line through the given points {x0, y0, x1, y1, ...}, with round joins and caps. */
@@ -330,16 +316,15 @@ public final class Canvas {
         if (points.length < 4) {
             return;
         }
-        nvgBeginPath(vg);
-        nvgMoveTo(vg, points[0], points[1]);
+        vg.beginPath();
+        vg.moveTo(points[0], points[1]);
         for (int i = 2; i + 1 < points.length; i += 2) {
-            nvgLineTo(vg, points[i], points[i + 1]);
+            vg.lineTo(points[i], points[i + 1]);
         }
-        nvgLineCap(vg, NVG_ROUND);
-        nvgLineJoin(vg, NVG_ROUND);
-        nvgStrokeWidth(vg, strokeWidth);
-        nvgStrokeColor(vg, nvg(stroke, color));
-        nvgStroke(vg);
+        vg.roundLines();
+        vg.strokeWidth(strokeWidth);
+        vg.strokeColor(stroke.r(), stroke.g(), stroke.b(), stroke.a());
+        vg.stroke();
     }
 
     /**
@@ -353,17 +338,7 @@ public final class Canvas {
         }
         int handle = -1;
         try {
-            byte[] data = bytes.get();
-            ByteBuffer buffer = MemoryUtil.memAlloc(data.length);
-            try {
-                buffer.put(data).flip();
-                handle = nvgCreateImageMem(vg, 0, buffer);
-            } finally {
-                MemoryUtil.memFree(buffer); // NanoVG has uploaded the decoded pixels by now
-            }
-            if (handle <= 0) {
-                handle = decodeWithImageIo(data);
-            }
+            handle = vg.createImage(bytes.get());
             if (handle <= 0) {
                 handle = -1;
                 System.err.println("unweird: can't decode image " + source
@@ -376,72 +351,40 @@ public final class Canvas {
         return handle;
     }
 
-    /** Formats NanoVG can't read (WebP, ...) via javax.imageio and whatever plugins are on the classpath. */
-    private int decodeWithImageIo(byte[] data) {
-        java.awt.image.BufferedImage image;
-        try {
-            image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(data));
-        } catch (java.io.IOException | RuntimeException e) {
-            return -1;
-        }
-        if (image == null) {
-            return -1;
-        }
-        int width = image.getWidth();
-        int height = image.getHeight();
-        int[] argb = image.getRGB(0, 0, width, height, null, 0, width);
-        ByteBuffer rgba = MemoryUtil.memAlloc(width * height * 4);
-        try {
-            for (int pixel : argb) {
-                rgba.put((byte) (pixel >> 16)).put((byte) (pixel >> 8)).put((byte) pixel).put((byte) (pixel >>> 24));
-            }
-            rgba.flip();
-            return nvgCreateImageRGBA(vg, width, height, 0, rgba);
-        } finally {
-            MemoryUtil.memFree(rgba);
-        }
-    }
-
     /** Pixel size of a loaded image, {width, height}. */
     int[] imageSize(int handle) {
-        int[] w = new int[1];
-        int[] h = new int[1];
-        nvgImageSize(vg, handle, w, h);
-        return new int[]{w[0], h[0]};
+        return vg.imageSize(handle);
     }
 
     void drawImage(int handle, float x, float y, float width, float height, float radius) {
-        nvgImagePattern(vg, x, y, width, height, 0, handle, 1, paint);
-        nvgBeginPath(vg);
-        nvgRoundedRect(vg, x, y, width, height, radius);
-        nvgFillPaint(vg, paint);
-        nvgFill(vg);
+        vg.imagePattern(x, y, width, height, handle, 1);
+        vg.beginPath();
+        vg.roundedRect(x, y, width, height, radius);
+        vg.fill();
     }
 
     /** Draws whatever {@code body} draws at reduced opacity (disabled widgets). */
     public void dimmed(Runnable body) {
-        nvgSave(vg);
-        nvgGlobalAlpha(vg, 0.45f);
+        vg.save();
+        vg.globalAlpha(0.45f);
         try {
             body.run();
         } finally {
-            nvgRestore(vg);
+            vg.restore();
         }
     }
 
     /** Restricts drawing to the given rectangle until {@link #unclip()}. Calls must be balanced. */
     public void clip(float x, float y, float width, float height) {
-        nvgSave(vg);
-        nvgIntersectScissor(vg, x, y, width, height);
+        vg.save();
+        vg.intersectScissor(x, y, width, height);
     }
 
     public void unclip() {
-        nvgRestore(vg);
+        vg.restore();
     }
 
     // ---- raw OpenGL surfaces ----
-
-    private final Map<Object, GlSurface> surfaces = new HashMap<>();
 
     /**
      * Lets {@code painter} draw with raw OpenGL into an offscreen surface (4x antialiased, with a depth buffer),
@@ -451,48 +394,29 @@ public final class Canvas {
     public void gl(Object owner, float x, float y, float width, float height, float radius, GlPainter painter) {
         int pixelWidth = Math.max(1, Math.round(width * pixelRatio));
         int pixelHeight = Math.max(1, Math.round(height * pixelRatio));
-        GlSurface surface = surfaces.computeIfAbsent(owner, o -> new GlSurface());
-        surface.render(vg, pixelWidth, pixelHeight, frame, painter);
-        // back to what NanoVG draws into
-        org.lwjgl.opengl.GL30C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, 0);
-        org.lwjgl.opengl.GL11C.glViewport(0, 0, framebufferWidth, framebufferHeight);
-        nvgImagePattern(vg, x, y, width, height, 0, surface.nvgImage, 1, paint);
-        nvgBeginPath(vg);
-        nvgRoundedRect(vg, x, y, width, height, radius);
-        nvgFillPaint(vg, paint);
-        nvgFill(vg);
+        int image = vg.gl(owner, pixelWidth, pixelHeight, frame, framebufferWidth, framebufferHeight, painter);
+        vg.imagePattern(x, y, width, height, image, 1);
+        vg.beginPath();
+        vg.roundedRect(x, y, width, height, radius);
+        vg.fill();
     }
 
     /** Frees surfaces nobody drew for a while (their widget is gone or hidden). Called once per frame. */
     void collectSurfaces() {
-        surfaces.values().removeIf(surface -> {
-            if (frame - surface.lastFrame > 300) {
-                surface.free(vg);
-                return true;
-            }
-            return false;
-        });
+        vg.collectSurfaces(frame - 300);
     }
 
     void free() {
-        surfaces.values().forEach(surface -> surface.free(vg));
-        surfaces.clear();
         for (int handle : images.values()) {
             if (handle > 0) {
-                nvgDeleteImage(vg, handle);
+                vg.deleteImage(handle);
             }
         }
         images.clear();
-        color.free();
-        color2.free();
-        paint.free();
     }
 
     private void font(Weight weight, float size, int align) {
-        nvgFontFaceId(vg, weight == Weight.SEMIBOLD ? semiboldFont : regularFont);
-        nvgFontSize(vg, size);
-        nvgTextLineHeight(vg, LINE_HEIGHT);
-        nvgTextAlign(vg, align);
+        vg.font(weight == Weight.SEMIBOLD ? semiboldFont : regularFont, size, LINE_HEIGHT, align);
     }
 
     private static int utf8Length(int codePoint) {
@@ -502,15 +426,15 @@ public final class Canvas {
         return 4;
     }
 
-    private static int nvgAlign(Align align) {
+    private static int vgAlign(Align align) {
         return switch (align) {
-            case LEFT -> NVG_ALIGN_LEFT;
-            case CENTER -> NVG_ALIGN_CENTER;
-            case RIGHT -> NVG_ALIGN_RIGHT;
+            case LEFT -> Vg.ALIGN_LEFT;
+            case CENTER -> Vg.ALIGN_CENTER;
+            case RIGHT -> Vg.ALIGN_RIGHT;
         };
     }
 
-    private static NVGColor nvg(Color c, NVGColor target) {
-        return nvgRGBAf(c.r(), c.g(), c.b(), c.a(), target);
+    private void fillColor(Color c) {
+        vg.fillColor(c.r(), c.g(), c.b(), c.a());
     }
 }

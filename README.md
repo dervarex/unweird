@@ -38,6 +38,8 @@ card, in the order you declared them.
 - **Installing content** (`unweird-install`) — search a catalog, install with verified downloads and dependencies,
   and an installed state that never lies
 - **3D** (`unweird-3d`) — 3D views inside normal layouts: scene graph, textures, orbit camera, picking
+- **Android** (`unweird-android`) — the same screens on phones: `class Main extends UnweirdActivity<LoginScreen> {}`,
+  touch scrolling, the on-screen keyboard and the back gesture handled for you
 - **Custom widgets** — public hooks for mouse, keyboard, scroll and file drops; raw OpenGL via `Canvas.gl(...)`
 
 ## Requirements
@@ -175,6 +177,12 @@ More in the [documentation](docs/README.md). Design notes and the roadmap are in
 Sign in with anything. The demo has a task list, a Modrinth browser that installs mods into `example/run/`,
 a 3D skin viewer (load your own skin by username) and a small block-world editor.
 
+The Android demo needs an Android SDK; `nix develop .#android` sets one up (see [Android](docs/android.md)):
+
+```bash
+./gradlew :example-android:installDebug
+```
+
 ## Building and testing
 
 ```bash
@@ -190,7 +198,9 @@ a 3D skin viewer (load your own skin by username) and a small block-world editor
 | `unweird-components` | Ready-made components, e.g. `LoginForm` |
 | `unweird-install` | Browse catalogs and install content from any source |
 | `unweird-3d` | 3D views: scene graph, meshes, textures, camera, picking |
+| `unweird-android` | Android backend: run the same screens on phones |
 | `example` | The demo app |
+| `example-android` | A small Android demo |
 
 ## Troubleshooting
 

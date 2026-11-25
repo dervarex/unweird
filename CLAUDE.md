@@ -19,6 +19,8 @@ Java UI library with its own renderer (LWJGL: GLFW + OpenGL 3.3 + NanoVG). Gradl
 - `unweird-components` — ready-made components (`LoginForm`)
 - `unweird-install` — generic `Source` → `Installer` → `ContentBrowser`; nothing catalog-specific belongs here
 - `unweird-3d` — `View3D`, scene graph, renderer; built on `Canvas.gl` + `requestFrame` from core
+- `unweird-android` — Android backend (`UnweirdActivity`, `AndroidWindow`, NanoVG via JNI in `src/main/cpp`);
+  only in the build when an Android SDK is found. `nix develop .#android` provides one. `example-android` is its demo
 - `example` — demo app; Modrinth source, skin viewer, world editor live here (app-specific code, not library)
 
 Docs for users: `docs/`. Design decisions and roadmap: `DESIGN.md`. Keep both current when behavior changes.
@@ -36,6 +38,9 @@ Docs for users: `docs/`. Design decisions and roadmap: `DESIGN.md`. Keep both cu
   `enabledIf`, `tooltip`...). A new widget, or a new relation method on `Widget`, needs these overrides.
 - **GL state**: code inside `Canvas.gl` may change anything; `GlSurface` restores what NanoVG needs.
 - Package-private on purpose: the layout, docking, overlays and window internals are not public API.
+- **Platforms**: `Window` is platform-neutral; GLFW lives only in `GlfwWindow`/`LwjglVg`. Core code outside those must
+  not touch LWJGL classes (GLFW key constants are fine: they're inlined at compile time). Avoid Java APIs Android
+  lacks (`List.getFirst`, virtual threads without a fallback, `java.awt`).
 
 ## API style (the owner cares about this)
 

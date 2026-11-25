@@ -138,6 +138,10 @@ public class Field extends Widget {
         return true;
     }
 
+    boolean isMasked() {
+        return masked;
+    }
+
     @Override
     boolean blinks() {
         return true;

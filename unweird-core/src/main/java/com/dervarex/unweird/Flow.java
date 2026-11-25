@@ -199,7 +199,7 @@ final class Flow {
                 joining.add(widget);
                 continue;
             }
-            List<Widget> last = rows.isEmpty() ? null : rows.getLast();
+            List<Widget> last = rows.isEmpty() ? null : rows.get(rows.size() - 1);
             if (grouped.test(widget) && last != null && last.stream().allMatch(grouped)) {
                 last.add(widget);
             } else {
@@ -268,8 +268,8 @@ final class Flow {
     }
 
     private static float gap(List<Widget> above, List<Widget> below, Mode mode) {
-        Widget a = above.getLast();
-        Widget b = below.getFirst();
+        Widget a = above.get(above.size() - 1);
+        Widget b = below.get(0);
         if (!Float.isNaN(b.gapBefore)) {
             return b.gapBefore;
         }
@@ -307,7 +307,7 @@ final class Flow {
         resolveButtonVariants(row);
         float[] widths = new float[row.size()];
         if (row.size() == 1) {
-            Widget only = row.getFirst();
+            Widget only = row.get(0);
             boolean natural = only.alignment != null || only instanceof Image || (only instanceof Button && mode == Mode.PAGE);
             widths[0] = natural ? only.measure(canvas, width).width() : width;
             return widths;
