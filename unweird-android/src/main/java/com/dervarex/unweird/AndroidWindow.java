@@ -217,14 +217,17 @@ final class AndroidWindow implements Platform, GLSurfaceView.Renderer {
                 return;
             }
             if (active) {
-                if (view.masked != masked) {
+                if (!view.editing || view.masked != masked) {
+                    view.editing = true;
                     view.masked = masked;
-                    keyboard.restartInput(view); // a password keyboard (no suggestions, no learning)
+                    keyboard.restartInput(view); // a fresh connection; a password keyboard for masked fields
                 }
                 view.requestFocus();
                 keyboard.showSoftInput(view, 0);
-            } else {
+            } else if (view.editing) {
+                view.editing = false;
                 keyboard.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                keyboard.restartInput(view);
             }
         });
     }
@@ -359,6 +362,11 @@ final class AndroidWindow implements Platform, GLSurfaceView.Renderer {
 
         private final AndroidWindow owner;
         boolean masked;
+        /**
+         * Whether a text field is being typed into. Only then does the view say it's a text editor: otherwise Android
+         * pops the keyboard up on its own as soon as the app starts.
+         */
+        boolean editing;
         /** Code points of the IME's current composing text, which we typed already and replace on each update. */
         private int composing;
 
@@ -396,11 +404,14 @@ final class AndroidWindow implements Platform, GLSurfaceView.Renderer {
 
         @Override
         public boolean onCheckIsTextEditor() {
-            return true;
+            return editing;
         }
 
         @Override
         public InputConnection onCreateInputConnection(EditorInfo info) {
+            if (!editing) {
+                return null; // hardware keys still arrive through onKeyDown
+            }
             info.inputType = masked
                     ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
                     : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT;
@@ -487,7 +498,9 @@ final class AndroidWindow implements Platform, GLSurfaceView.Renderer {
                         | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
             }
             // the keyboard reports itself as an inset instead of covering the content
-            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            // and it stays down until a field is tapped
+            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                    | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         }
 
         @SuppressWarnings("deprecation")
