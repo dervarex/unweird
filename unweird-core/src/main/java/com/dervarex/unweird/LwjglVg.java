@@ -7,9 +7,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
@@ -28,7 +26,6 @@ final class LwjglVg implements Vg {
     private final float[] bounds = new float[4];
     /** Font data must outlive the context: NanoVG reads from it while drawing. */
     private final List<ByteBuffer> fonts = new ArrayList<>();
-    private final Map<Object, GlSurface> surfaces = new HashMap<>();
 
     LwjglVg() {
         vg = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
@@ -267,30 +264,19 @@ final class LwjglVg implements Vg {
     }
 
     @Override
-    public int gl(Object owner, int pixelWidth, int pixelHeight, long frame, int framebufferWidth, int framebufferHeight, GlPainter painter) {
-        GlSurface surface = surfaces.computeIfAbsent(owner, o -> new GlSurface());
-        surface.render(vg, pixelWidth, pixelHeight, frame, painter);
-        // back to what NanoVG draws into
-        org.lwjgl.opengl.GL30C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, 0);
-        org.lwjgl.opengl.GL11C.glViewport(0, 0, framebufferWidth, framebufferHeight);
-        return surface.nvgImage;
+    public int imageFromTexture(int texture, int width, int height) {
+        // antialiased edges over a transparent background come out premultiplied
+        return org.lwjgl.nanovg.NanoVGGL3.nvglCreateImageFromHandle(vg, texture, width, height,
+                org.lwjgl.nanovg.NanoVGGL3.NVG_IMAGE_NODELETE | NVG_IMAGE_FLIPY | NVG_IMAGE_PREMULTIPLIED);
     }
 
     @Override
-    public void collectSurfaces(long oldestFrame) {
-        surfaces.values().removeIf(surface -> {
-            if (surface.lastFrame < oldestFrame) {
-                surface.free(vg);
-                return true;
-            }
-            return false;
-        });
+    public Gl openGl() {
+        return LwjglGl.INSTANCE;
     }
 
     @Override
     public void delete() {
-        surfaces.values().forEach(surface -> surface.free(vg));
-        surfaces.clear();
         nvgDelete(vg);
         fonts.forEach(MemoryUtil::memFree);
         fonts.clear();

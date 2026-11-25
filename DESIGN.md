@@ -9,7 +9,7 @@ no string IDs, no layout boilerplate, no `bind().map()` chains.
 |---|---|
 | Language | Java 21 (compiled with `--release 21`) |
 | Rendering | Own renderer: NanoVG for shapes and text. Desktop: LWJGL (GLFW window + OpenGL 3.3). Android: NanoVG built with the NDK on OpenGL ES 3 |
-| Platforms | Linux first, Android (UI; 3D later), Windows later, macOS nice-to-have |
+| Platforms | Linux first, Android, Windows later, macOS nice-to-have |
 | Getters | Lombok (`@Getter`, `@With`) in the library and in user code — never hand-written |
 | Versions | `gradle/libs.versions.toml` |
 
@@ -411,7 +411,7 @@ The window title is "<screen @Title> — <app name>". A remembered position is o
 | **M6** ✅ | `unweird-install`: generic `Source` → `Installer` (verified downloads, dependencies, archives, honest installed state) + `ContentBrowser`; Modrinth source in the example |
 | **v2** | `unweird-anim`: hover/press transitions, screen transitions; Windows support |
 | **M7** ✅ | Foundations: custom-widget input API (`Slider` built on it), window options (`Unweird.app(...)`), dialogs, toasts, `async`, timers, `@Shortcut`/`focus()`, tooltips, `maxLines`, field undo, fallback fonts |
-| **Android** | `unweird-android` (branch `android`): core split into platform-neutral `Window` + `Platform`/`Vg` backends; touch scrolling and flings, on-screen keyboard, back gesture as Escape, system-bar insets; 3D (`Canvas.gl` on GLES) next |
+| **Android** | `unweird-android` (branch `android`): core split into platform-neutral `Window` + `Platform`/`Vg` backends; touch scrolling and flings, on-screen keyboard, back gesture as Escape, system-bar insets. 3D: `Gl` (the OpenGL 3.3 / ES 3.0 common subset) under `Canvas.gl`, `GlSurface` and the 3D renderer; `Pixels` for image decoding without AWT |
 | **3D** ✅ | `unweird-3d` (branch `3d-rendering`): `View3D` in normal layouts, scene graph, meshes/box UV, textures, materials, orbit camera, picking; `Canvas.gl` + `requestFrame` in core; skin viewer and world editor demos |
 
 ## Open points

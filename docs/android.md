@@ -22,6 +22,8 @@ That's the whole Android-specific code. `LoginScreen` and everything it leads to
 | Hover, tooltips | None (no pointer). With a mouse plugged in (Chromebooks, desktop mode) hover works like on desktop |
 | Logical pixels | Density-independent pixels (dp), so sizes match other apps |
 | `Unweird.open(url)` | Opens the link in the browser (or the app that handles it) |
+| 3D (`View3D`), `Canvas.gl` | Same, on OpenGL ES 3. Drag turns the camera; there's no pinch-to-zoom yet. Raw GL code must use `Gl` (see [Your own widgets](custom-widgets.md)) |
+| Images, textures | PNG and JPEG as on desktop, plus whatever Android decodes (WebP, HEIF). `BufferedImage` doesn't exist: use `Pixels` |
 | Window size, icon, `remember()` | Don't apply. The app's icon and name come from the manifest |
 
 The status and navigation bars are drawn over by the theme's background, and their icons turn dark or light with
@@ -70,12 +72,14 @@ android {
     }
 }
 
+// LWJGL is unweird's desktop backend; Android draws with its own.
 configurations.configureEach {
     exclude(group = "org.lwjgl")
 }
 
 dependencies {
     implementation(project(":unweird-android"))
+    implementation(project(":unweird-3d"))          // optional: 3D views work on Android too
     annotationProcessor(project(":unweird-processor"))
 }
 ```
@@ -140,6 +144,5 @@ Without Nix, install Android Studio (or the command-line tools) and set `ANDROID
 
 ## Not there yet
 
-- `Canvas.gl`, and with it `unweird-3d`: a 3D view stays empty on Android for now.
 - More than one finger (pinch to zoom), long-press menus, text selection handles.
 - Dropping files onto the window (`onDrop`).

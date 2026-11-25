@@ -70,13 +70,24 @@ As long as someone asks for frames, the window renders continuously. When nobody
 ## Raw OpenGL
 
 ```java
+Gl gl = canvas.openGl();
 canvas.gl(this, getX(), getY(), getWidth(), getHeight(), radius, (pixelWidth, pixelHeight) -> {
-    // plain GL 3.3 here: the target is a 4x multisampled framebuffer with depth, already cleared
+    // the target is a 4x multisampled framebuffer with depth, already cleared
+    gl.clearColor(0.1f, 0.1f, 0.2f, 1);
+    gl.clear(Gl.COLOR_BUFFER_BIT);
 });
 ```
 
 The result is placed like an image, so it clips and scrolls with the page. Mess up GL state as you like, it's
 restored afterwards. This is what `unweird-3d` is built on.
+
+`Gl` is the part of OpenGL that desktop (3.3) and Android (ES 3.0) share: shaders, buffers, vertex arrays,
+textures, framebuffers. Code written against it runs on both. Start shader sources with `gl.shaderVersion()`, which
+is `#version 330 core` on desktop and `#version 300 es` (with default precisions) on Android. On desktop you can also
+call LWJGL's `GL33C` directly, but then it's desktop only.
+
+On Android the GL context can be lost while the app is in the background. When `canvas.openGl()` returns a different
+`Gl` than last frame, create your programs, buffers and textures again.
 
 ## Chaining
 
