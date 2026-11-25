@@ -21,6 +21,8 @@ Java UI library with its own renderer (LWJGL: GLFW + OpenGL 3.3 + NanoVG). Gradl
 - `unweird-3d` — `View3D`, scene graph, renderer; built on `Canvas.gl` + `requestFrame` from core
 - `unweird-android` — Android backend (`UnweirdActivity`, `AndroidWindow`, NanoVG via JNI in `src/main/cpp`);
   only in the build when an Android SDK is found. `nix develop .#android` provides one. `example-android` is its demo
+- `unweird-gradle-plugin` — `com.dervarex.unweird` plugin (plain Java, `java-gradle-plugin`); talks to the Android
+  plugin by reflection so it doesn't depend on a particular AGP version
 - `example` — demo app; Modrinth source, skin viewer, world editor live here (app-specific code, not library)
 
 Docs for users: `docs/`. Design decisions and roadmap: `DESIGN.md`. Keep both current when behavior changes.
