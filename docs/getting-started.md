@@ -13,14 +13,14 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.dervarex.unweird:unweird-core:v0.1.2")
+    implementation("com.github.dervarex.unweird:unweird-core:v0.2.0")
     // the annotation processor records the order of your widget fields
-    annotationProcessor("com.github.dervarex.unweird:unweird-processor:v0.1.2")
+    annotationProcessor("com.github.dervarex.unweird:unweird-processor:v0.2.0")
 
     // optional
-    implementation("com.github.dervarex.unweird:unweird-components:v0.1.2")
-    implementation("com.github.dervarex.unweird:unweird-install:v0.1.2")
-    implementation("com.github.dervarex.unweird:unweird-3d:v0.1.2")
+    implementation("com.github.dervarex.unweird:unweird-components:v0.2.0")
+    implementation("com.github.dervarex.unweird:unweird-install:v0.2.0")
+    implementation("com.github.dervarex.unweird:unweird-3d:v0.2.0")
 }
 ```
 
@@ -33,14 +33,14 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.dervarex.unweird:unweird-core:v0.1.2'
+    implementation 'com.github.dervarex.unweird:unweird-core:v0.2.0'
     // the annotation processor records the order of your widget fields
-    annotationProcessor 'com.github.dervarex.unweird:unweird-processor:v0.1.2'
+    annotationProcessor 'com.github.dervarex.unweird:unweird-processor:v0.2.0'
 
     // optional
-    implementation 'com.github.dervarex.unweird:unweird-components:v0.1.2'
-    implementation 'com.github.dervarex.unweird:unweird-install:v0.1.2'
-    implementation 'com.github.dervarex.unweird:unweird-3d:v0.1.2'
+    implementation 'com.github.dervarex.unweird:unweird-components:v0.2.0'
+    implementation 'com.github.dervarex.unweird:unweird-install:v0.2.0'
+    implementation 'com.github.dervarex.unweird:unweird-3d:v0.2.0'
 }
 ```
 
@@ -69,7 +69,7 @@ pluginManagement {
 // build.gradle.kts
 plugins {
     application
-    id("com.dervarex.unweird") version "v0.1.2"
+    id("com.dervarex.unweird") version "v0.2.0"
 }
 
 repositories {
@@ -93,7 +93,7 @@ Don't skip the annotation processor. unweird adds your widget fields to the scre
 Java can't tell that order at runtime. The processor writes it down at compile time. Without it you get
 `no field order recorded for ...` on startup.
 
-You need Java 21+ and OpenGL 3.3. Linux works; Windows and macOS aren't done yet.
+You need Java 21+ and OpenGL 3.3. Linux works; Windows and macOS aren't done yet. Android: see [Android](android.md).
 
 On NixOS, run with a regular JDK (one Gradle or IntelliJ downloads), not one from the Nix store: Nix-built JDKs
 can't see the system's `libGL`, and you get "couldn't load OpenGL". The error message lists the alternatives.

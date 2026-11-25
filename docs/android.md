@@ -111,8 +111,10 @@ recreates the activity and the app starts over at the first screen.
 Without the plugin's packaging rule the build fails with `2 files found with path 'META-INF/unweird/fields.idx'`:
 each module (unweird itself and your app) records its widget field order in a file with that name.
 
-`unweird-android` isn't on JitPack yet. Until it is, include unweird as a build next to your app
-(`includeBuild("../unweird")` in your settings file) and use the project dependencies shown above.
+The plugin comes from JitPack like the libraries; the [settings](getting-started.md#or-the-gradle-plugin) are the same
+as on desktop, plus `google()` in both repository lists for the Android plugin. Without the plugin, the dependencies
+are `com.github.dervarex.unweird:unweird-android:v0.2.0` (and `unweird-processor`, `unweird-3d`) instead of the
+project dependencies above.
 
 ### Theme and fonts
 

@@ -1,5 +1,6 @@
 plugins {
     `java-gradle-plugin`
+    `maven-publish` // publishes the plugin jar (pluginMaven) and its plugin marker
 }
 
 // `plugins { id("com.dervarex.unweird") }`: unweird, its annotation processor and the platform bits in one line.

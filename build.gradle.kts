@@ -20,7 +20,8 @@ plugins {
 
 allprojects {
     group = "com.dervarex"
-    version = "0.1.0-SNAPSHOT"
+    // JitPack builds with VERSION set to the tag (or commit); the Gradle plugin hands this version out
+    version = System.getenv("VERSION") ?: "0.2.0-SNAPSHOT"
 
     repositories {
         google()
