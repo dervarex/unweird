@@ -120,7 +120,13 @@ public class UnweirdPlugin implements Plugin<Project> {
     /** One of unweird's modules: from the included unweird build if there is one, otherwise from JitPack. */
     static Dependency module(Project project, UnweirdExtension unweird, String name) {
         return project.getDependencies().create(coordinates(project.getGradle().getIncludedBuilds().stream()
-                .anyMatch(build -> build.getName().equals("unweird")), name, unweird.getVersion().get()));
+                .anyMatch(build -> isUnweird(build.getProjectDir())), name, unweird.getVersion().get()));
+    }
+
+    /** Whether an included build is a checkout of unweird, whatever its folder is called. */
+    static boolean isUnweird(java.io.File buildDir) {
+        return new java.io.File(buildDir, "unweird-core/build.gradle.kts").isFile()
+                && new java.io.File(buildDir, "unweird-processor").isDirectory();
     }
 
     static String coordinates(boolean includedBuild, String module, String version) {

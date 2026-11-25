@@ -77,6 +77,15 @@ class UnweirdPluginTest {
     }
 
     @Test
+    void recognizesACheckoutByItsModules(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        assertFalse(UnweirdPlugin.isUnweird(dir.toFile()));
+        java.nio.file.Files.createDirectories(dir.resolve("unweird-core"));
+        java.nio.file.Files.createDirectories(dir.resolve("unweird-processor"));
+        java.nio.file.Files.writeString(dir.resolve("unweird-core/build.gradle.kts"), "");
+        assertTrue(UnweirdPlugin.isUnweird(dir.toFile()));
+    }
+
+    @Test
     void includedBuildUsesTheLocalGroup() {
         assertEquals("com.dervarex:unweird-core:1.0", UnweirdPlugin.coordinates(true, "unweird-core", "1.0"));
         assertEquals("com.github.dervarex.unweird:unweird-core:1.0", UnweirdPlugin.coordinates(false, "unweird-core", "1.0"));
