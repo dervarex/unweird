@@ -10,10 +10,11 @@ final class AndroidVg implements Vg {
 
     static {
         System.loadLibrary("unweird");
+        Pixels.decoder = AndroidVg::decode; // no java.awt on Android
     }
 
     private final long ctx;
-    private boolean warnedGl;
+    private final Gl gl = new AndroidGl();
 
     AndroidVg() {
         ctx = nCreate();
@@ -180,27 +181,25 @@ final class AndroidVg implements Vg {
 
     /** Formats NanoVG can't read (WebP, HEIF, ...): Android's own decoders. */
     private int decodeWithBitmapFactory(byte[] encoded) {
+        Pixels pixels = decode(encoded);
+        return pixels == null ? 0 : Math.max(0, nCreateImageRgba(ctx, pixels.width(), pixels.height(), pixels.rgba()));
+    }
+
+    /** Android's own decoders (PNG, JPEG, WebP, HEIF, ...); null if it isn't an image. Used for {@link Pixels#decode}. */
+    static Pixels decode(byte[] encoded) {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inPreferredConfig = Bitmap.Config.ARGB_8888;
         options.inPremultiplied = false;
         Bitmap bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.length, options);
         if (bitmap == null) {
-            return 0;
+            return null;
         }
         try {
             int width = bitmap.getWidth();
             int height = bitmap.getHeight();
             int[] argb = new int[width * height];
             bitmap.getPixels(argb, 0, width, 0, 0, width, height);
-            byte[] rgba = new byte[argb.length * 4];
-            for (int i = 0; i < argb.length; i++) {
-                int pixel = argb[i];
-                rgba[i * 4] = (byte) (pixel >> 16);
-                rgba[i * 4 + 1] = (byte) (pixel >> 8);
-                rgba[i * 4 + 2] = (byte) pixel;
-                rgba[i * 4 + 3] = (byte) (pixel >>> 24);
-            }
-            return Math.max(0, nCreateImageRgba(ctx, width, height, rgba));
+            return Pixels.fromArgb(width, height, argb);
         } finally {
             bitmap.recycle();
         }
@@ -217,16 +216,13 @@ final class AndroidVg implements Vg {
     }
 
     @Override
-    public int gl(Object owner, int pixelWidth, int pixelHeight, long frame, int framebufferWidth, int framebufferHeight, GlPainter painter) {
-        if (!warnedGl) {
-            warnedGl = true;
-            System.err.println("unweird: Canvas.gl (3D views) isn't available on Android yet; " + owner.getClass().getSimpleName() + " stays empty");
-        }
-        return 0;
+    public int imageFromTexture(int texture, int width, int height) {
+        return nImageFromTexture(ctx, texture, width, height);
     }
 
     @Override
-    public void collectSurfaces(long oldestFrame) {
+    public Gl openGl() {
+        return gl;
     }
 
     @Override
@@ -304,4 +300,6 @@ final class AndroidVg implements Vg {
     private static native int[] nImageSize(long ctx, int image);
 
     private static native void nDeleteImage(long ctx, int image);
+
+    private static native int nImageFromTexture(long ctx, int texture, int width, int height);
 }

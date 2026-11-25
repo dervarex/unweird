@@ -2,29 +2,23 @@ package com.dervarex.unweird.scene3d;
 
 import com.dervarex.unweird.Unweird;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
+import com.dervarex.unweird.Pixels;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Objects;
 
 /**
- * An image for {@link Material}s. Loaded from the classpath, a file, a URL (in the background) or a
- * {@link BufferedImage}; {@link #set} swaps the picture later (e.g. a new skin), the GPU copy follows on the next frame.
+ * An image for {@link Material}s. Loaded from the classpath, a file, a URL (in the background) or {@link Pixels}
+ * (on desktop, {@code Pixels.of(bufferedImage)}); {@link #set} swaps the picture later (e.g. a new skin), the GPU copy
+ * follows on the next frame.
  */
 public final class Texture {
-
-    private static final HttpClient HTTP = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL)
-            .connectTimeout(Duration.ofSeconds(10)).build();
 
     private volatile int width;
     private volatile int height;
@@ -45,7 +39,7 @@ public final class Texture {
             if (in == null) {
                 throw new IllegalArgumentException("No such resource: " + absolute);
             }
-            return of(ImageIO.read(in));
+            return bytes(in.readAllBytes());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -66,9 +60,9 @@ public final class Texture {
         return texture;
     }
 
-    public static Texture of(BufferedImage image) {
+    public static Texture of(Pixels pixels) {
         Texture texture = new Texture();
-        texture.set(image);
+        texture.set(pixels);
         return texture;
     }
 
@@ -80,15 +74,7 @@ public final class Texture {
     }
 
     private static Texture bytes(byte[] data) {
-        try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(data));
-            if (image == null) {
-                throw new IllegalArgumentException("Not an image format Java can read");
-            }
-            return of(image);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return of(Pixels.decode(data));
     }
 
     /** Pixel-sharp scaling (no blur): right for pixel art like Minecraft skins. */
@@ -99,44 +85,41 @@ public final class Texture {
     }
 
     /** Replaces the picture. Safe from any thread. */
-    public void set(BufferedImage image) {
-        Objects.requireNonNull(image, "image");
-        int w = image.getWidth();
-        int h = image.getHeight();
-        int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
-        byte[] rgba = new byte[w * h * 4];
-        for (int i = 0; i < argb.length; i++) {
-            int p = argb[i];
-            rgba[i * 4] = (byte) (p >> 16);
-            rgba[i * 4 + 1] = (byte) (p >> 8);
-            rgba[i * 4 + 2] = (byte) p;
-            rgba[i * 4 + 3] = (byte) (p >>> 24);
-        }
-        setPixels(w, h, rgba);
+    public void set(Pixels picture) {
+        Objects.requireNonNull(picture, "picture");
+        setPixels(picture.width(), picture.height(), picture.rgba().clone());
     }
 
     /** Replaces the picture with one downloaded in the background. Errors are kept in {@link #problem()}. */
     public void load(String url) {
         problem = null;
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "unweird").timeout(Duration.ofSeconds(20)).build();
-        HTTP.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray()).whenComplete((response, error) -> {
+        Thread thread = new Thread(() -> {
             try {
-                if (error != null) {
-                    throw new IOException(error.getMessage(), error);
-                }
-                if (response.statusCode() / 100 != 2) {
-                    throw new IOException("HTTP " + response.statusCode());
-                }
-                BufferedImage image = ImageIO.read(new ByteArrayInputStream(response.body()));
-                if (image == null) {
-                    throw new IOException("not an image");
-                }
-                set(image);
+                set(Pixels.decode(download(url)));
             } catch (IOException | RuntimeException e) {
                 problem = "Couldn't load " + url + ": " + e.getMessage();
             }
             Unweird.refresh();
-        });
+        }, "unweird-texture");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private static byte[] download(String url) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) URI.create(url).toURL().openConnection();
+        connection.setConnectTimeout(10_000);
+        connection.setReadTimeout(20_000);
+        connection.setRequestProperty("User-Agent", "unweird");
+        try {
+            if (connection.getResponseCode() / 100 != 2) {
+                throw new IOException("HTTP " + connection.getResponseCode());
+            }
+            try (InputStream in = connection.getInputStream()) {
+                return in.readAllBytes();
+            }
+        } finally {
+            connection.disconnect();
+        }
     }
 
     private synchronized void setPixels(int w, int h, byte[] rgba) {

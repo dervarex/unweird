@@ -3,13 +3,8 @@ package com.dervarex.unweird;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -28,10 +23,6 @@ public class Image extends Widget {
 
     private static final float PLACEHOLDER = 48;
 
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
     /** Downloads by URL, shared by every image showing the same URL. */
     private static final Map<String, CompletableFuture<byte[]>> DOWNLOADS = new ConcurrentHashMap<>();
 
@@ -103,18 +94,18 @@ public class Image extends Widget {
     }
 
     private static CompletableFuture<byte[]> download(String url) {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "unweird")
-                .build();
-        return HTTP.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
-                .thenApply(response -> {
-                    if (response.statusCode() / 100 != 2) {
-                        throw new IllegalStateException("HTTP " + response.statusCode());
-                    }
-                    return response.body();
-                })
-                .whenComplete((body, error) -> Unweird.refresh());
+        CompletableFuture<byte[]> download = new CompletableFuture<>();
+        Thread thread = new Thread(() -> {
+            try {
+                download.complete(Http.get(url));
+            } catch (IOException | RuntimeException e) {
+                download.completeExceptionally(e);
+            }
+            Unweird.refresh();
+        }, "unweird-image");
+        thread.setDaemon(true);
+        thread.start();
+        return download;
     }
 
     /** Shows the image at this size (logical pixels) instead of its natural size. */

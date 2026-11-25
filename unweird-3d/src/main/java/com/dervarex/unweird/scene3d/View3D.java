@@ -126,7 +126,7 @@ public class View3D extends Widget {
             requestFrame();
         }
         canvas.gl(this, getX(), getY(), getWidth(), getHeight(), canvas.getTheme().getRadius() * 1.5f,
-                (width, height) -> renderer.render(scene, camera, width, height));
+                (width, height) -> renderer.render(canvas.openGl(), scene, camera, width, height));
         if (isFocused() && isFocusVisible()) {
             canvas.strokeRect(getX(), getY(), getWidth(), getHeight(), canvas.getTheme().getRadius() * 1.5f, 2,
                     canvas.getTheme().getAccent().withAlpha(0.6f));

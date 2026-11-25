@@ -28,7 +28,13 @@ android {
     }
 }
 
+// LWJGL is unweird's desktop backend; Android draws with its own.
+configurations.configureEach {
+    exclude(group = "org.lwjgl")
+}
+
 dependencies {
     implementation(project(":unweird-android"))
+    implementation(project(":unweird-3d"))
     annotationProcessor(project(":unweird-processor"))
 }

@@ -386,6 +386,13 @@ public final class Canvas {
 
     // ---- raw OpenGL surfaces ----
 
+    private final Map<Object, GlSurface> surfaces = new HashMap<>();
+
+    /** The OpenGL calls for {@link #gl}; the same on desktop and Android. */
+    public Gl openGl() {
+        return vg.openGl();
+    }
+
     /**
      * Lets {@code painter} draw with raw OpenGL into an offscreen surface (4x antialiased, with a depth buffer),
      * then shows the result at (x, y, width, height) like an image: clipped, scrolled and rounded like everything else.
@@ -394,7 +401,12 @@ public final class Canvas {
     public void gl(Object owner, float x, float y, float width, float height, float radius, GlPainter painter) {
         int pixelWidth = Math.max(1, Math.round(width * pixelRatio));
         int pixelHeight = Math.max(1, Math.round(height * pixelRatio));
-        int image = vg.gl(owner, pixelWidth, pixelHeight, frame, framebufferWidth, framebufferHeight, painter);
+        GlSurface surface = surfaces.computeIfAbsent(owner, o -> new GlSurface());
+        Gl opengl = vg.openGl();
+        surface.render(vg, opengl, pixelWidth, pixelHeight, frame, painter);
+        opengl.bindFramebuffer(Gl.FRAMEBUFFER, 0); // back to what NanoVG draws into
+        opengl.viewport(0, 0, framebufferWidth, framebufferHeight);
+        int image = surface.nvgImage;
         vg.imagePattern(x, y, width, height, image, 1);
         vg.beginPath();
         vg.roundedRect(x, y, width, height, radius);
@@ -403,10 +415,18 @@ public final class Canvas {
 
     /** Frees surfaces nobody drew for a while (their widget is gone or hidden). Called once per frame. */
     void collectSurfaces() {
-        vg.collectSurfaces(frame - 300);
+        surfaces.values().removeIf(surface -> {
+            if (frame - surface.lastFrame > 300) {
+                surface.free(vg, vg.openGl());
+                return true;
+            }
+            return false;
+        });
     }
 
     void free() {
+        surfaces.values().forEach(surface -> surface.free(vg, vg.openGl()));
+        surfaces.clear();
         for (int handle : images.values()) {
             if (handle > 0) {
                 vg.deleteImage(handle);

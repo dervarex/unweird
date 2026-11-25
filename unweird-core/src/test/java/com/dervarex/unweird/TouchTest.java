@@ -243,8 +243,8 @@ class TouchTest {
         @Override public int createImage(byte[] encoded) { return 0; }
         @Override public int[] imageSize(int image) { return new int[]{0, 0}; }
         @Override public void deleteImage(int image) { }
-        @Override public int gl(Object owner, int w, int h, long frame, int fw, int fh, GlPainter painter) { return 0; }
-        @Override public void collectSurfaces(long oldestFrame) { }
+        @Override public int imageFromTexture(int texture, int width, int height) { return 0; }
+        @Override public Gl openGl() { throw new UnsupportedOperationException(); }
         @Override public void delete() { }
     }
 }
