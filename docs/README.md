@@ -13,5 +13,6 @@ Read them in order the first time, after that jump around.
 9. [Installing content](installing-content.md) — `unweird-install`
 10. [3D](3d.md) — `unweird-3d`
 11. [Android](android.md) — the same screens on phones, `unweird-android`
+12. [IntelliJ plugin](intellij.md) — New Project wizard, templates, inspections
 
 The demo app in `example/` uses almost everything here; `example-android/` is a small phone version. If something is unclear, look at how it does it.

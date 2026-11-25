@@ -25,6 +25,7 @@ no string IDs, no layout boilerplate, no `bind().map()` chains.
 | `unweird-gradle-plugin` | `com.dervarex.unweird`: adds modules + processor; desktop natives per OS; Android packaging, Java 21, no LWJGL |
 | `example` | The login/home demo app |
 | `example-android` | A small phone demo |
+| `intellij-plugin` | IntelliJ plugin (separate build): New Project wizard, New unweird Class, live templates, inspections |
 
 More `unweird-*` modules can be added later.
 

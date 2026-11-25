@@ -1,0 +1,10 @@
+#if (${PACKAGE_NAME} && ${PACKAGE_NAME} != "")package ${PACKAGE_NAME};#end
+
+import com.dervarex.unweird.Component;
+import com.dervarex.unweird.Text;
+
+/** A group of widgets for screens: declare it as a field, like any widget. */
+public class ${NAME} extends Component {
+
+    Text title = new Text("${NAME}");
+}
