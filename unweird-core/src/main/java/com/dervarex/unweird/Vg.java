@@ -91,13 +91,13 @@ interface Vg {
     void deleteImage(int image);
 
     /**
-     * Paints raw OpenGL into an offscreen surface owned by {@code owner} (see {@link Canvas#gl}) and returns the
-     * image showing it. Afterwards the target framebuffer is bound again.
+     * Shows an OpenGL texture (premultiplied, bottom row first, owned by the caller) as an image. Used for
+     * {@link Canvas#gl} surfaces.
      */
-    int gl(Object owner, int pixelWidth, int pixelHeight, long frame, int framebufferWidth, int framebufferHeight, GlPainter painter);
+    int imageFromTexture(int texture, int width, int height);
 
-    /** Frees GL surfaces not painted since {@code oldestFrame}. */
-    void collectSurfaces(long oldestFrame);
+    /** The OpenGL calls of this platform. */
+    Gl openGl();
 
     /** Frees everything, including the context. */
     void delete();

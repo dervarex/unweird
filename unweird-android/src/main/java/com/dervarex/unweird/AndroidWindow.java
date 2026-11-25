@@ -65,6 +65,7 @@ final class AndroidWindow implements Platform, GLSurfaceView.Renderer {
         });
         wakeUp = view::requestRender;
         Unweird.opener = this::open;
+        Pixels.decoder = AndroidVg::decode; // no java.awt on Android
     }
 
     View view() {

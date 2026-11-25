@@ -1,15 +1,8 @@
 package com.dervarex.unweird;
 
-import static org.lwjgl.nanovg.NanoVG.NVG_IMAGE_FLIPY;
-import static org.lwjgl.nanovg.NanoVG.NVG_IMAGE_PREMULTIPLIED;
-import static org.lwjgl.nanovg.NanoVG.nvgDeleteImage;
-import static org.lwjgl.nanovg.NanoVGGL3.NVG_IMAGE_NODELETE;
-import static org.lwjgl.nanovg.NanoVGGL3.nvglCreateImageFromHandle;
-import static org.lwjgl.opengl.GL33C.*;
-
 /**
  * An offscreen OpenGL target for {@link Canvas#gl}: a multisampled framebuffer to draw into, resolved into a
- * plain texture that NanoVG shows as an image.
+ * plain texture that NanoVG shows as an image. Written against {@link Gl}, so it works on desktop and Android.
  */
 final class GlSurface {
 
@@ -26,104 +19,103 @@ final class GlSurface {
     int nvgImage;
     long lastFrame;
 
-    void render(long vg, int width, int height, long frame, GlPainter painter) {
+    void render(Vg vg, Gl gl, int width, int height, long frame, GlPainter painter) {
         lastFrame = frame;
         if (width != this.width || height != this.height || texture == 0) {
-            free(vg);
-            create(vg, width, height);
+            free(vg, gl);
+            create(vg, gl, width, height);
         }
-        glBindFramebuffer(GL_FRAMEBUFFER, drawFramebuffer);
-        glViewport(0, 0, width, height);
-        glDisable(GL_SCISSOR_TEST);
-        glDepthMask(true);
-        glColorMask(true, true, true, true);
-        glClearColor(0, 0, 0, 0);
-        glClearDepth(1);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        gl.bindFramebuffer(Gl.FRAMEBUFFER, drawFramebuffer);
+        gl.viewport(0, 0, width, height);
+        gl.disable(Gl.SCISSOR_TEST);
+        gl.depthMask(true);
+        gl.colorMask(true, true, true, true);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clearDepth(1);
+        gl.clear(Gl.COLOR_BUFFER_BIT | Gl.DEPTH_BUFFER_BIT | Gl.STENCIL_BUFFER_BIT);
         try {
             painter.paint(width, height);
         } finally {
             // leave GL the way NanoVG expects it
-            glBindVertexArray(0);
-            glUseProgram(0);
-            glDisable(GL_DEPTH_TEST);
-            glDisable(GL_CULL_FACE);
-            glDepthMask(true);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            gl.bindVertexArray(0);
+            gl.useProgram(0);
+            gl.disable(Gl.DEPTH_TEST);
+            gl.disable(Gl.CULL_FACE);
+            gl.depthMask(true);
+            gl.activeTexture(Gl.TEXTURE0);
+            gl.bindTexture(Gl.TEXTURE_2D, 0);
             if (samples > 1) {
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, drawFramebuffer);
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFramebuffer);
-                glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                gl.bindFramebuffer(Gl.READ_FRAMEBUFFER, drawFramebuffer);
+                gl.bindFramebuffer(Gl.DRAW_FRAMEBUFFER, resolveFramebuffer);
+                gl.blitFramebuffer(0, 0, width, height, 0, 0, width, height, Gl.COLOR_BUFFER_BIT, Gl.NEAREST);
             }
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl.bindFramebuffer(Gl.FRAMEBUFFER, 0);
         }
     }
 
-    private void create(long vg, int width, int height) {
+    private void create(Vg vg, Gl gl, int width, int height) {
         this.width = width;
         this.height = height;
-        samples = Math.min(SAMPLES, glGetInteger(GL_MAX_SAMPLES));
+        samples = Math.min(SAMPLES, gl.getInteger(Gl.MAX_SAMPLES));
 
-        texture = glGenTextures();
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (java.nio.ByteBuffer) null);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glBindTexture(GL_TEXTURE_2D, 0);
+        texture = gl.genTexture();
+        gl.bindTexture(Gl.TEXTURE_2D, texture);
+        gl.texImage2D(Gl.TEXTURE_2D, 0, Gl.RGBA8, width, height, Gl.RGBA, Gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_MIN_FILTER, Gl.LINEAR);
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_MAG_FILTER, Gl.LINEAR);
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_WRAP_S, Gl.CLAMP_TO_EDGE);
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_WRAP_T, Gl.CLAMP_TO_EDGE);
+        gl.bindTexture(Gl.TEXTURE_2D, 0);
 
-        resolveFramebuffer = glGenFramebuffers();
-        glBindFramebuffer(GL_FRAMEBUFFER, resolveFramebuffer);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+        resolveFramebuffer = gl.genFramebuffer();
+        gl.bindFramebuffer(Gl.FRAMEBUFFER, resolveFramebuffer);
+        gl.framebufferTexture2D(Gl.FRAMEBUFFER, Gl.COLOR_ATTACHMENT0, Gl.TEXTURE_2D, texture, 0);
 
         if (samples > 1) {
-            drawFramebuffer = glGenFramebuffers();
-            glBindFramebuffer(GL_FRAMEBUFFER, drawFramebuffer);
-            colorBuffer = glGenRenderbuffers();
-            glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-            glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
-            depthBuffer = glGenRenderbuffers();
-            glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-            glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, width, height);
+            drawFramebuffer = gl.genFramebuffer();
+            gl.bindFramebuffer(Gl.FRAMEBUFFER, drawFramebuffer);
+            colorBuffer = gl.genRenderbuffer();
+            gl.bindRenderbuffer(Gl.RENDERBUFFER, colorBuffer);
+            gl.renderbufferStorageMultisample(Gl.RENDERBUFFER, samples, Gl.RGBA8, width, height);
+            gl.framebufferRenderbuffer(Gl.FRAMEBUFFER, Gl.COLOR_ATTACHMENT0, Gl.RENDERBUFFER, colorBuffer);
+            depthBuffer = gl.genRenderbuffer();
+            gl.bindRenderbuffer(Gl.RENDERBUFFER, depthBuffer);
+            gl.renderbufferStorageMultisample(Gl.RENDERBUFFER, samples, Gl.DEPTH24_STENCIL8, width, height);
         } else {
             drawFramebuffer = resolveFramebuffer;
-            depthBuffer = glGenRenderbuffers();
-            glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+            depthBuffer = gl.genRenderbuffer();
+            gl.bindRenderbuffer(Gl.RENDERBUFFER, depthBuffer);
+            gl.renderbufferStorage(Gl.RENDERBUFFER, Gl.DEPTH24_STENCIL8, width, height);
         }
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
-        int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        glBindRenderbuffer(GL_RENDERBUFFER, 0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        if (status != GL_FRAMEBUFFER_COMPLETE) {
+        gl.framebufferRenderbuffer(Gl.FRAMEBUFFER, Gl.DEPTH_STENCIL_ATTACHMENT, Gl.RENDERBUFFER, depthBuffer);
+        int status = gl.checkFramebufferStatus(Gl.FRAMEBUFFER);
+        gl.bindRenderbuffer(Gl.RENDERBUFFER, 0);
+        gl.bindFramebuffer(Gl.FRAMEBUFFER, 0);
+        if (status != Gl.FRAMEBUFFER_COMPLETE) {
             throw new IllegalStateException("unweird: can't create an OpenGL surface (status 0x" + Integer.toHexString(status) + ")");
         }
-        // antialiased edges over a transparent background come out premultiplied
-        nvgImage = nvglCreateImageFromHandle(vg, texture, width, height, NVG_IMAGE_NODELETE | NVG_IMAGE_FLIPY | NVG_IMAGE_PREMULTIPLIED);
+        nvgImage = vg.imageFromTexture(texture, width, height);
     }
 
-    void free(long vg) {
+    void free(Vg vg, Gl gl) {
         if (nvgImage > 0) {
-            nvgDeleteImage(vg, nvgImage);
+            vg.deleteImage(nvgImage);
             nvgImage = 0;
         }
         if (drawFramebuffer != 0 && drawFramebuffer != resolveFramebuffer) {
-            glDeleteFramebuffers(drawFramebuffer);
+            gl.deleteFramebuffer(drawFramebuffer);
         }
         if (resolveFramebuffer != 0) {
-            glDeleteFramebuffers(resolveFramebuffer);
+            gl.deleteFramebuffer(resolveFramebuffer);
         }
         if (colorBuffer != 0) {
-            glDeleteRenderbuffers(colorBuffer);
+            gl.deleteRenderbuffer(colorBuffer);
         }
         if (depthBuffer != 0) {
-            glDeleteRenderbuffers(depthBuffer);
+            gl.deleteRenderbuffer(depthBuffer);
         }
         if (texture != 0) {
-            glDeleteTextures(texture);
+            gl.deleteTexture(texture);
         }
         drawFramebuffer = resolveFramebuffer = colorBuffer = depthBuffer = texture = 0;
         width = height = 0;

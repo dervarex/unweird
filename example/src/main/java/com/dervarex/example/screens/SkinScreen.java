@@ -5,6 +5,7 @@ import com.dervarex.example.skin.SkinModel;
 import com.dervarex.unweird.Button;
 import com.dervarex.unweird.Field;
 import com.dervarex.unweird.Pointer;
+import com.dervarex.unweird.Pixels;
 import com.dervarex.unweird.Screen;
 import com.dervarex.unweird.Slider;
 import com.dervarex.unweird.Text;
@@ -91,7 +92,7 @@ public class SkinScreen extends Screen {
 
     private void show(SkinLoader.Skin loaded) {
         loading = false;
-        skin.set(loaded.image());
+        skin.set(Pixels.of(loaded.image()));
         if (loaded.slim() != null) {
             slim.checked(loaded.slim());
             model.slim(loaded.slim());
