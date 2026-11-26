@@ -26,8 +26,13 @@ Java UI library with its own renderer (LWJGL: GLFW + OpenGL 3.3 + NanoVG). Gradl
 - `unweird-gradle-plugin` — `com.dervarex.unweird` plugin (plain Java, `java-gradle-plugin`); talks to the Android
   plugin by reflection so it doesn't depend on a particular AGP version
 - `example` — demo app; Modrinth source, skin viewer, world editor live here (app-specific code, not library)
+- `examples` — small apps for the docs site, one source set per folder in `examples/src/` (so `@Default`
+  components don't leak between them); `./gradlew :examples:runTodo`
 
-Docs for users: `docs/`. Design decisions and roadmap: `DESIGN.md`. Keep both current when behavior changes.
+Docs for users: `docs/`, a VitePress site deployed to GitHub Pages by `.github/workflows/docs.yml`
+(`cd docs && npm install && npm run dev`). Example pages are generated from `examples/` by
+`docs/examples/generate.py`; screenshots in `docs/public/shots/` are taken on Xvfb (dark theme).
+Design decisions and roadmap: `DESIGN.md`. Keep both current when behavior changes.
 
 ## How the core works (things that bite)
 

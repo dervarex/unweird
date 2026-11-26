@@ -16,6 +16,7 @@ include(
     "unweird-3d",
     "unweird-gradle-plugin",
     "example",
+    "examples",
 )
 
 // The Android modules need an Android SDK (ANDROID_HOME, or sdk.dir in local.properties; `nix develop .#android`

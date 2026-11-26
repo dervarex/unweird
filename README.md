@@ -166,7 +166,7 @@ View3D view = new View3D(new Scene().add(new Node(Mesh.box(1, 1, 1), Material.co
         .onClick((hit, button) -> ...);
 ```
 
-More in the [documentation](docs/README.md). Design notes and the roadmap are in [DESIGN.md](DESIGN.md).
+More in the **[documentation](https://dervarex.github.io/unweird/)**: guides, [examples](https://dervarex.github.io/unweird/examples/) with screenshots, and [snippets](https://dervarex.github.io/unweird/snippets) to copy. Design notes and the roadmap are in [DESIGN.md](DESIGN.md).
 
 ## Running the demo
 
@@ -201,6 +201,7 @@ The Android demo needs an Android SDK; `nix develop .#android` sets one up (see 
 | `unweird-android` | Android backend: run the same screens on phones |
 | `unweird-gradle-plugin` | `id("com.dervarex.unweird")`: dependencies, processor and platform setup in one line |
 | `example` | The demo app |
+| `examples` | Small apps shown on the docs site (`./gradlew :examples:runTodo`) |
 | `example-android` | A small Android demo |
 | `intellij-plugin` | IntelliJ IDEA plugin: New Project wizard, file and live templates, inspections (separate build) |
 

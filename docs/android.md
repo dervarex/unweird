@@ -54,7 +54,7 @@ android {
 
 The plugin adds `unweird-android` and the annotation processor, keeps LWJGL (the desktop backend) out, sets Java 21
 and tells Android to combine unweird's index files (`META-INF/unweird/**`) instead of failing on duplicates.
-`unweird { threeD = true }` adds 3D. See [Getting started](getting-started.md) for where the plugin comes from.
+`unweird { threeD = true }` adds 3D. See [Getting started](index.md#add-it-to-your-build) for where the plugin comes from.
 
 <details><summary>Without the plugin</summary>
 
@@ -111,7 +111,7 @@ recreates the activity and the app starts over at the first screen.
 Without the plugin's packaging rule the build fails with `2 files found with path 'META-INF/unweird/fields.idx'`:
 each module (unweird itself and your app) records its widget field order in a file with that name.
 
-The plugin comes from JitPack like the libraries; the [settings](getting-started.md#or-the-gradle-plugin) are the same
+The plugin comes from JitPack like the libraries; the [settings](index.md#add-it-to-your-build) are the same
 as on desktop, plus `google()` in both repository lists for the Android plugin. Without the plugin, the dependencies
 are `com.github.dervarex.unweird:unweird-android:v0.2.0` (and `unweird-processor`, `unweird-3d`) instead of the
 project dependencies above.
@@ -143,6 +143,10 @@ adb install -r example-android/build/outputs/apk/debug/example-android-debug.apk
 
 Without Nix, install Android Studio (or the command-line tools) and set `ANDROID_HOME`, or put `sdk.dir=...` into
 `local.properties`. The Android modules are only part of the build when an SDK is found; desktop builds don't need one.
+
+## Desktop and Android in one project
+
+See [Desktop + Android](multiplatform.md): screens in a shared module, a small launcher per platform.
 
 ## Not there yet
 

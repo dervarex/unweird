@@ -51,9 +51,9 @@ configure(javaModules) {
     }
 }
 
-// Library modules are published (JitPack builds them from a git tag); the example app isn't.
+// Library modules are published (JitPack builds them from a git tag); the demo app and the examples aren't.
 // The Gradle plugin publishes itself (java-gradle-plugin).
-configure(javaModules.filter { it.name != "example" && it.name != "unweird-gradle-plugin" }) {
+configure(javaModules.filter { it.name !in setOf("example", "examples", "unweird-gradle-plugin") }) {
     apply(plugin = "maven-publish")
 
     extensions.configure<JavaPluginExtension> {
@@ -90,7 +90,7 @@ configure(javaModules) {
 
 // The sources jar must match the bytecode: modules using Lombok publish "delomboked" sources (with the generated
 // getters written out), otherwise IDEs report "library source does not match the bytecode".
-configure(javaModules.filter { it.name != "example" }) {
+configure(javaModules.filter { it.name != "example" && it.name != "examples" }) {
     afterEvaluate {
         val compileClasspath = configurations.getByName("compileClasspath")
         if (compileClasspath.allDependencies.none { it.group == "org.projectlombok" }) {

@@ -20,7 +20,7 @@ Install the zip with *Settings → Plugins → ⚙ → Install Plugin from Disk�
 | Android | An `app` module with the activity (`extends UnweirdActivity<HomeScreen>`) and its manifest |
 | Desktop + Android | `shared` (the screens), `desktop` and `android`, both using `shared` |
 
-Every module uses the [Gradle plugin](getting-started.md#or-the-gradle-plugin), so the build files stay short.
+Every module uses the [Gradle plugin](index.md#add-it-to-your-build), so the build files stay short.
 *3D views* and *Ready-made components* add `unweird-3d` and `unweird-components`. Under *unweird version* you pick a
 release, or a local checkout of unweird to build against (an `includeBuild`, handy when you work on unweird itself).
 The Gradle wrapper is included, and the project is imported and synced when it opens.

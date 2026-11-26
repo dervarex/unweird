@@ -1,10 +1,11 @@
-# Installing content (`unweird-install`)
+# Installing content
 
 For apps that let people browse a catalog and install things into a folder: mods, resource packs, plugins, assets.
 It doesn't know any catalog. You plug one in.
 
 ```kotlin
-implementation("com.github.dervarex.unweird:unweird-install:v0.2.0")
+unweird { install = true }
+// or: implementation("com.github.dervarex.unweird:unweird-install:v0.2.0")
 ```
 
 ## Plug in a source
@@ -38,7 +39,7 @@ public class MySource implements Source {
 ```
 
 A `Release` can also unpack archives (`.unpack(zipPath, "overrides/", "")`), keep extra info
-(`.info("minecraft", "1.21.1")`) and clean up temp files (`.temporary(path)`). `Downloads.temporary(url, sha1, agent)`
+(`.info("gameVersion", "1.21.1")`) and clean up temp files (`.temporary(path)`). `Downloads.temporary(url, sha1, agent)`
 helps when you have to download something first (like a modpack index).
 
 Throw an exception with a readable message when something's wrong ("No version for 1.21.1"); the user sees it.
@@ -81,5 +82,3 @@ Search field, kind dropdown, result cards with icons, Install/Remove buttons wit
 
 `example/src/main/java/com/dervarex/example/modrinth/` is a complete Modrinth source in about 200 lines:
 mods, resource packs, shaders, data packs and `.mrpack` modpacks.
-
-Next: [3D](3d.md)
